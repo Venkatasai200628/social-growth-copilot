@@ -1,0 +1,35 @@
+{
+  "name": "social-growth-copilot",
+  "version": "0.3.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "groq-sdk": "^0.15.0",
+    "lucide-react": "^0.511.0",
+    "clsx": "^2.1.1",
+    "firebase": "^11.6.0",
+    "recharts": "^2.15.3",
+    "razorpay": "^2.9.6",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "eslint": "^9.25.1",
+    "eslint-config-next": "^15.3.0"
+  }
+}
