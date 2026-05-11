@@ -3,9 +3,18 @@ const nextConfig = {
   reactStrictMode: true,
   devIndicators: false,
 
-  // Faster page transitions
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', 'firebase'],
+  },
+
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        '@composio/core': false,
+      };
+    }
+    return config;
   },
 
   images: {
@@ -17,7 +26,6 @@ const nextConfig = {
     ],
   },
 
-  // Reduce bundle size
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
