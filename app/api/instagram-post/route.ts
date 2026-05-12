@@ -31,14 +31,15 @@ export async function POST(req: NextRequest) {
     const entityId = process.env.COMPOSIO_ENTITY_ID || 'default';
 
     // Execute the Instagram publish action
-    const result = await client.tools.execute({
-      slug: 'INSTAGRAM_MEDIA_PUBLISH',
-      connectedAccountId: entityId,
-      input: {
-        image_url: imageUrl,
-        caption: fullCaption,
-      },
-    });
+    // TO:
+  const result = await client.tools.execute(
+    'INSTAGRAM_MEDIA_PUBLISH',
+    {
+      image_url: imageUrl,
+      caption: fullCaption,
+    },
+    { connectedAccountId: entityId }
+  );
 
     return NextResponse.json({
       success: true,
