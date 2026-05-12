@@ -92,7 +92,7 @@ export async function GET() {
     return NextResponse.json({
       connected: !!igAccount,
       accountId: igAccount?.id || null,
-      username: igAccount?.metadata?.username || null,
+      username: (igAccount as any)?.metadata?.username || null,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
