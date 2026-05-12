@@ -62,22 +62,22 @@ export interface FormData {
 }
 
 export const CATEGORIES = [
-  { value: 'Food & Beverage',          label: 'Food & Beverage' },
-  { value: 'Fashion & Clothing',       label: 'Fashion & Clothing' },
-  { value: 'Tech Startup',             label: 'Tech Startup' },
-  { value: 'Events & Hackathons',      label: 'Events & Hackathons' },
-  { value: 'Real Estate',              label: 'Real Estate' },
-  { value: 'Education & Courses',      label: 'Education & Courses' },
-  { value: 'Healthcare & Wellness',    label: 'Healthcare & Wellness' },
-  { value: 'Gold & Jewellery',         label: 'Gold & Jewellery' },
-  { value: 'Grocery & FMCG',           label: 'Grocery & FMCG' },
-  { value: 'Beauty & Makeup',          label: 'Beauty & Makeup' },
-  { value: 'B2B Services',             label: 'B2B Services' },
-  { value: 'Local Business',           label: 'Local Business' },
-  { value: 'Fitness & Gym',            label: 'Fitness & Gym' },
-  { value: 'Travel & Tourism',         label: 'Travel & Tourism' },
-  { value: 'Entertainment',            label: 'Entertainment' },
-  { value: 'Other',                    label: 'Other' },
+  { value: 'Food & Beverage',          label: 'Food & Beverage',          emoji: '🍔' },
+  { value: 'Fashion & Clothing',       label: 'Fashion & Clothing',       emoji: '👗' },
+  { value: 'Tech Startup',             label: 'Tech Startup',             emoji: '💻' },
+  { value: 'Events & Hackathons',      label: 'Events & Hackathons',      emoji: '🎪' },
+  { value: 'Real Estate',             label: 'Real Estate',              emoji: '🏠' },
+  { value: 'Education & Courses',      label: 'Education & Courses',      emoji: '📚' },
+  { value: 'Healthcare & Wellness',    label: 'Healthcare & Wellness',    emoji: '🏥' },
+  { value: 'Gold & Jewellery',         label: 'Gold & Jewellery',         emoji: '💍' },
+  { value: 'Grocery & FMCG',           label: 'Grocery & FMCG',           emoji: '🛒' },
+  { value: 'Beauty & Makeup',          label: 'Beauty & Makeup',          emoji: '💄' },
+  { value: 'B2B Services',             label: 'B2B Services',             emoji: '🤝' },
+  { value: 'Local Business',           label: 'Local Business',           emoji: '🏪' },
+  { value: 'Fitness & Gym',            label: 'Fitness & Gym',            emoji: '💪' },
+  { value: 'Travel & Tourism',         label: 'Travel & Tourism',         emoji: '✈️' },
+  { value: 'Entertainment',            label: 'Entertainment',            emoji: '🎬' },
+  { value: 'Other',                    label: 'Other',                    emoji: '✨' },
 ];
 
 export const GOALS = [
