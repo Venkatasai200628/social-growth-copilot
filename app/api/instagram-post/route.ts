@@ -32,14 +32,15 @@ export async function POST(req: NextRequest) {
 
     // Execute the Instagram publish action
     // TO:
-  const result = await client.tools.execute(
-  'INSTAGRAM_MEDIA_PUBLISH',
-  {
+  // @ts-ignore — composio SDK types don't match runtime API
+const result = await client.tools.execute({
+  slug: 'INSTAGRAM_MEDIA_PUBLISH',
+  connectedAccountId: entityId,
+  input: {
     image_url: imageUrl,
     caption: fullCaption,
-  } as Record<string, unknown>,
-  { connectedAccountId: entityId }
-);
+  },
+});
 
     return NextResponse.json({
       success: true,
