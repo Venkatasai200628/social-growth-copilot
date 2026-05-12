@@ -33,13 +33,13 @@ export async function POST(req: NextRequest) {
     // Execute the Instagram publish action
     // TO:
   const result = await client.tools.execute(
-    'INSTAGRAM_MEDIA_PUBLISH',
-    {
-      image_url: imageUrl,
-      caption: fullCaption,
-    },
-    { connectedAccountId: entityId }
-  );
+  'INSTAGRAM_MEDIA_PUBLISH',
+  {
+    image_url: imageUrl,
+    caption: fullCaption,
+  } as Record<string, unknown>,
+  { connectedAccountId: entityId }
+);
 
     return NextResponse.json({
       success: true,
