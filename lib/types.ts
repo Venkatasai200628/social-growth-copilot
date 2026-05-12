@@ -89,3 +89,16 @@ export const GOALS = [
   { value: 'Launch New Product',        label: 'Launch New Product' },
   { value: 'Re-engagement',             label: 'Re-engagement' },
 ];
+export type Platform = string;
+
+export interface BudgetStrategy {
+  tier: string;
+  tierLabel: string;
+  influencerCount: number;
+  costPerInfluencer: number;
+  boostBudget: number;
+  bestPlatform: string;
+  reachMin: number;
+  reachMax: number;
+  summary: string;
+}
