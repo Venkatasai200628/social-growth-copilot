@@ -48,3 +48,43 @@ export interface Campaign {
   createdAt: number;
   updatedAt: number;
 }
+
+export interface FormData {
+  product?: string;
+  productName: string;
+  category: string;
+  goal: string;
+  budget: string;
+  targetAudience: string;
+  platforms: string[];
+  duration: string;
+}
+
+export const CATEGORIES = [
+  { value: 'Food & Beverage',          label: 'Food & Beverage' },
+  { value: 'Fashion & Clothing',       label: 'Fashion & Clothing' },
+  { value: 'Tech Startup',             label: 'Tech Startup' },
+  { value: 'Events & Hackathons',      label: 'Events & Hackathons' },
+  { value: 'Real Estate',              label: 'Real Estate' },
+  { value: 'Education & Courses',      label: 'Education & Courses' },
+  { value: 'Healthcare & Wellness',    label: 'Healthcare & Wellness' },
+  { value: 'Gold & Jewellery',         label: 'Gold & Jewellery' },
+  { value: 'Grocery & FMCG',           label: 'Grocery & FMCG' },
+  { value: 'Beauty & Makeup',          label: 'Beauty & Makeup' },
+  { value: 'B2B Services',             label: 'B2B Services' },
+  { value: 'Local Business',           label: 'Local Business' },
+  { value: 'Fitness & Gym',            label: 'Fitness & Gym' },
+  { value: 'Travel & Tourism',         label: 'Travel & Tourism' },
+  { value: 'Entertainment',            label: 'Entertainment' },
+  { value: 'Other',                    label: 'Other' },
+];
+
+export const GOALS = [
+  { value: 'Brand Awareness',           label: 'Brand Awareness' },
+  { value: 'Drive Sales / Conversions', label: 'Drive Sales / Conversions' },
+  { value: 'Generate Leads',            label: 'Generate Leads' },
+  { value: 'Grow Followers',            label: 'Grow Followers' },
+  { value: 'Promote Event',             label: 'Promote Event' },
+  { value: 'Launch New Product',        label: 'Launch New Product' },
+  { value: 'Re-engagement',             label: 'Re-engagement' },
+];

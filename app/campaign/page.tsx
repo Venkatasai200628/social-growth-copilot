@@ -30,7 +30,7 @@ function parseMarkdown(text: string) {
 
 function CampaignInner() {
   const toast = useToast();
-  const [form, setForm] = useState({ product:'', category:'', goal:'', budget:'', targetAudience:'', platforms:[] as string[], duration:'7' });
+  const [form, setForm] = useState({ product:'', productName:'', category:'', goal:'', budget:'', targetAudience:'', platforms:[] as string[], duration:'7' })
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
@@ -85,7 +85,7 @@ function CampaignInner() {
             <div className="md:col-span-2">
               <label className="block text-xs font-light text-slate-500 uppercase tracking-widest mb-2">Product / Service *</label>
               <input type="text" placeholder="e.g. Gold jewellery shop in Nellore, SaaS HR tool, Biryani restaurant..."
-                value={form.product} onChange={e=>setForm({...form,product:e.target.value})}
+                value={form.product} onChange={e=>setForm({...form,product:e.target.value,productName:e.target.value})}
                 className="w-full bg-white/[0.02] border border-white/[0.07] rounded-xl px-4 py-3 text-white placeholder-slate-700 focus:outline-none focus:border-violet-500/30 text-sm font-light"/>
             </div>
 
