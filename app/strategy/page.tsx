@@ -62,7 +62,7 @@ export default function StrategyPage() {
             Here&apos;s your game plan
           </h1>
           <p style={{ fontSize: 15, color: "var(--text-secondary)", margin: 0 }}>
-            Based on your budget of <strong>{budgetLabel(form.budget)}</strong>, here&apos;s what we recommend.
+            Based on your budget of <strong>{budgetLabel(parseInt(form.budget) || 0)}</strong>, here&apos;s what we recommend.
           </p>
         </div>
 
@@ -83,7 +83,7 @@ export default function StrategyPage() {
             background: "var(--brand-light)", color: "var(--brand)",
             borderRadius: 99, padding: "4px 12px", fontSize: 13, fontWeight: 600,
           }}>
-            {budgetLabel(form.budget)}
+            {budgetLabel(parseInt(form.budget) || 0)}
           </div>
         </div>
 
@@ -131,11 +131,11 @@ export default function StrategyPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <BudgetRow label={`${strategy.influencerCount} influencer${strategy.influencerCount > 1 ? "s" : ""} × ${budgetLabel(strategy.costPerInfluencer)}`}
                   value={budgetLabel(strategy.influencerCount * strategy.costPerInfluencer)}
-                  percent={Math.round((strategy.influencerCount * strategy.costPerInfluencer / form.budget) * 100)}
+                  percent={Math.round((strategy.influencerCount * strategy.costPerInfluencer / (parseInt(form.budget) || 1)) * 100)}
                   color="#6c47ff" />
                 <BudgetRow label="Paid post boosting"
                   value={budgetLabel(strategy.boostBudget)}
-                  percent={Math.round((strategy.boostBudget / form.budget) * 100)}
+                  percent={Math.round((strategy.boostBudget / (parseInt(form.budget) || 1)) * 100)}
                   color="#f97316" />
               </div>
             )}
