@@ -15,6 +15,7 @@ export interface UserOrder {
   goal: string;
   budget: number;
   platforms: string[];
+  duration?: number;
   promotionEfficiency: 'conservative' | 'balanced' | 'aggressive';
   videoUrl?: string;
   websiteUrl?: string;
