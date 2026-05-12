@@ -29,7 +29,7 @@ export default function StrategyPage() {
 
   if (!form) return null;
 
-  const strategy = calcBudgetStrategy(form.budget, form.platforms);
+  const strategy = calcBudgetStrategy(parseInt(form.budget) || 0, form.platforms);
   const cat = CATEGORIES.find(c => c.value === form.category);
   const goal = GOALS.find(g => g.value === form.goal);
 
