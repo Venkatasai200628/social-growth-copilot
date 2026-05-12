@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     // Execute the Instagram publish action
     // TO:
-  // @ts-ignore — composio SDK types don't match runtime API
+  // @ts-expect-error — composio SDK types don't match runtime API
 const result = await client.tools.execute({
   slug: 'INSTAGRAM_MEDIA_PUBLISH',
   connectedAccountId: entityId,
