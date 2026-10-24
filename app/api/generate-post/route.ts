@@ -1,132 +1,183 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGroqClient, MODEL } from '@/lib/groq';
+import { chatJSON } from '@/lib/groq';
+import { languagePrompt, festivalPrompt } from '@/lib/india';
+import { PALETTE_IDS, POSTER_LAYOUTS } from '@/lib/poster';
+import { requireAuth } from '@/lib/auth-guard';
+import { readJson, badRequest, serverError } from '../_lib/http';
+
+interface PosterAI {
+  palette?: string;
+  layout?: string;
+  kicker?: string;
+  headline?: string;
+  sub?: string;
+  offer_text?: string;
+}
+
+interface ReplyTemplate {
+  trigger?: unknown;
+  reply?: unknown;
+}
+
+interface PostResult {
+  poster?: PosterAI;
+  caption?: string;
+  caption_b?: string;
+  hashtags?: unknown;
+  first_comment?: string;
+  story_idea?: string;
+  best_time?: string;
+  whatsapp_message?: string;
+  reply_templates?: ReplyTemplate[];
+  image_prompt?: string;
+}
+
+interface TogetherImage {
+  data?: Array<{ url?: string; b64_json?: string }>;
+}
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
-    const { businessName, category, productDescription, targetAudience,
-            platform, postType, tone, goal, offer, customPrompt } = await req.json();
-    const groq = getGroqClient();
+    const body = await readJson<{
+      businessName?: string; category?: string; productDescription?: string; targetAudience?: string;
+      platform?: string; postType?: string; tone?: string; goal?: string; offer?: string; language?: string; festival?: string;
+      customPrompt?: string; hasPhoto?: boolean;
+    }>(req);
+    if (!body) return badRequest('Invalid request — please refresh the page and try again.');
+    const {
+      businessName, category, productDescription, targetAudience,
+      platform, postType, tone, goal, offer, language, festival,
+      customPrompt, hasPhoto,
+    } = body;
 
-    const formatGuide: Record<string, string> = {
-      'Reel':      'SHORT VIDEO REEL — caption under 150 chars, action words, urgent offer pill.',
-      'Story':     'STORY (9:16) — ultra short caption 1-2 sentences, bold text readable at glance.',
-      'Carousel':  'CAROUSEL — headline teases slide 1, caption starts with "Swipe to see...", list 3-5 benefits.',
-      'Ad Copy':   'PAID AD — pain point → solution → offer. Headline is the hook. Offer pill = conversion CTA.',
-      'Feed Post': 'FEED POST — longer caption: hook, story, CTA. Shareable and emotional.',
-    };
-    const formatInstruction = formatGuide[postType] || formatGuide['Feed Post'];
-    const hasDetailedPrompt = customPrompt && customPrompt.length > 80;
+    // ── Validation ────────────────────────────────────────────────
+    if (!businessName?.trim()) return NextResponse.json({ error: 'Business name is required.' }, { status: 400 });
+    if (!category?.trim()) return NextResponse.json({ error: 'Please choose your business category.' }, { status: 400 });
+    if (!productDescription?.trim()) return NextResponse.json({ error: 'Please describe your product or service.' }, { status: 400 });
+    if (!platform?.trim()) return NextResponse.json({ error: 'Please choose a platform.' }, { status: 400 });
+    if (!postType?.trim()) return NextResponse.json({ error: 'Please choose a post type.' }, { status: 400 });
+    if (!tone?.trim()) return NextResponse.json({ error: 'Please choose a tone.' }, { status: 400 });
+    if (!goal?.trim()) return NextResponse.json({ error: 'Please choose a goal.' }, { status: 400 });
 
-    const systemPrompt = `You are an elite social media visual designer and content strategist for premium brands.
-${hasDetailedPrompt ? 'The user has provided a detailed creative brief — follow it EXACTLY for tone, style, image description, and content. It overrides all defaults.' : ''}
-CRITICAL RULES:
-1. Respond ONLY with valid JSON — no markdown, no explanation, no code fences.
-2. In JSON string values, NEVER use real newline characters. Use the literal token [BREAK] for paragraph breaks.
-3. Keep all string values on one line — no line breaks inside strings.
-4. Headline must be SHORT — max 18 characters total so it fits the canvas.`;
+    // ── Prompts ───────────────────────────────────────────────────
+    const systemPrompt = `You are GrowMitra's elite marketing copywriter and art director for Indian small businesses — you make a local shop's Instagram look like a national brand. You think like a copywriter (scroll-stopping hooks, WhatsApp-forwardable offers) AND like an art director (poster hierarchy, palette, typography fit).
+${languagePrompt(language)}
+${festivalPrompt(festival, [productDescription, customPrompt].filter(Boolean).join(' '))}
+${hasPhoto ? "PHOTO RULE: the poster will feature the owner's ACTUAL product photo. kicker/headline/sub must COMPLEMENT the photo — add offer context, emotion — never describe or repeat what the photo already shows." : 'NO PHOTO: the poster is pure typography — the headline and sub carry the whole design.'}
 
-    const userPrompt = hasDetailedPrompt
-      ? `${customPrompt}
+QUALITY BAR (this is what separates you from a cheap template):
+- Hooks must be SPECIFIC to this business, product, city or offer. If a hook could be pasted onto any shop's post, rewrite it.
+- Lead with the most concrete detail the owner gave you (price, dish, fabric, occasion, landmark, delivery promise) — specifics sell, adjectives don't.
+- If the owner's description is short, vague or garbled, still write confidently for the CATEGORY (e.g. a jewellery store gets craftsmanship/trust/occasion angles) — never invent facts (no fake discounts, no fake reviews), never ask questions back.
+- BANNED: "elevate your style", "unlock happiness", "dhamaka" unless the owner said it, "limited stock!!!", triple exclamation marks, more than 3 emojis per caption, wishing a festival the owner didn't ask for.
+- Vary sentence rhythm: short punch → one flowing line → clear CTA.
 
-BUSINESS: ${businessName} (${category})
-PLATFORM: ${platform} | POST TYPE: ${postType}
-${offer ? `OFFER: ${offer}` : ''}
+HARD RULES:
+1. Respond ONLY with valid JSON — no markdown, no code fences, no commentary.
+2. NEVER put real newline characters inside JSON string values. Use the literal token [BREAK] for paragraph breaks. Keep every string on one line.
+3. poster.headline is the display-serif line: English only, max 26 characters, Latin characters only.
+4. poster.sub is the supporting line: English only, max 80 characters.
+5. caption, caption_b, first_comment, story_idea, whatsapp_message and reply_templates must ALL be in English — never Hindi, Hinglish or any Indic script.
+6. If no offer was given, do NOT invent a discount — set poster.offer_text to "" and make the CTA about visiting/enquiring/ordering. NEVER invent offers, discounts, delivery promises, locations or ingredients the owner did not state; write only from the brief.
+7. [BREAK] tokens in caption/caption_b must survive exactly as written — do not convert them to spaces or newlines.`;
 
-Follow the creative brief above exactly. Return this JSON structure (use [BREAK] not real newlines in string values):
-{
-  "visual_style": "<luxury_dark|bold_minimal|vibrant_gradient|editorial_clean|neon_modern|earthy_warm>",
-  "colors": {"bg":"<hex>","bg2":"<hex>","accent":"<hex>","accent2":"<hex>","text_primary":"<hex>","text_secondary":"<hex>"},
-  "headline": "<MAX 18 CHARS — punchy brand headline>",
-  "headline_accent": "<1-2 words from headline to highlight in accent color, or empty string>",
-  "tagline": "<max 6 words — elegant brand tagline>",
-  "badge_text": "<max 4 words — occasion or collection label>",
-  "offer_text": "<max 5 words — CTA pill text, or empty string if no offer>",
-  "visual_motif": "<geometric_circles|diagonal_lines|dot_grid|hexagon_pattern|wave_lines>",
-  "caption": "<hook sentence>[BREAK][BREAK]<body 2-3 sentences>[BREAK][BREAK]<CTA>",
-  "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8","#tag9","#tag10","#tag11","#tag12"],
-  "first_comment": "<engaging question to post within 5 min of publishing>",
-  "story_idea": "<15-30s companion Story concept>",
-  "best_time": "<specific day and time e.g. Sunday 7:00 PM IST>",
-  "image_prompt": "<DETAILED AI image generation prompt — describe subject, lighting, background, mood, jewellery style, colours — minimum 60 words. This is critical — make it extremely specific based on the brief.>",
-  "reply_templates": [
-    {"trigger":"<question>","reply":"<premium reply>"},
-    {"trigger":"<question>","reply":"<premium reply>"},
-    {"trigger":"<question>","reply":"<premium reply>"},
-    {"trigger":"<question>","reply":"<premium reply>"}
-  ]
-}`
-      : `Create a complete social media post package.
+    const userPrompt = `Create a complete, ready-to-post package.
 
 BUSINESS: ${businessName} (${category})
-PRODUCT: ${productDescription}
-AUDIENCE: ${targetAudience || 'general audience'}
+PRODUCT/SERVICE: ${productDescription}
+AUDIENCE: ${targetAudience?.trim() || 'local customers'}
 PLATFORM: ${platform} | POST TYPE: ${postType}
 TONE: ${tone} | GOAL: ${goal}
-${offer ? `OFFER: ${offer}` : ''}
-${customPrompt ? `VISUAL INSTRUCTIONS (follow exactly for style and image): ${customPrompt}` : ''}
-FORMAT: ${formatInstruction}
+${offer?.trim() ? `OFFER: ${offer}` : 'OFFER: none given'}
+${customPrompt?.trim() ? `OWNER'S EXTRA INSTRUCTIONS (highest priority — follow exactly): ${customPrompt}` : ''}
 
-Return this JSON (use [BREAK] not real newlines in strings, headline max 18 chars):
+Return EXACTLY this JSON structure (use the literal token [BREAK] instead of real newlines inside strings):
 {
-  "visual_style": "<match the tone — luxury_dark for premium, vibrant_gradient for fun, editorial_clean for minimal>",
-  "colors": {"bg":"<hex>","bg2":"<hex>","accent":"<hex>","accent2":"<hex>","text_primary":"<hex>","text_secondary":"<hex>"},
-  "headline": "<MAX 18 CHARS>",
-  "headline_accent": "<1-2 accent words or empty string>",
-  "tagline": "<max 6 words>",
-  "badge_text": "<max 4 words>",
-  "offer_text": "<max 5 words or empty string>",
-  "visual_motif": "<geometric_circles|diagonal_lines|dot_grid|hexagon_pattern|wave_lines>",
-  "caption": "<hook>[BREAK][BREAK]<body>[BREAK][BREAK]<CTA>",
-  "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8","#tag9","#tag10","#tag11","#tag12","#tag13","#tag14","#tag15"],
-  "first_comment": "<engaging question>",
-  "story_idea": "<15-30s story concept>",
-  "best_time": "<specific day + time IST>",
-  "image_prompt": "<detailed AI image prompt — minimum 50 words describing the exact visual scene, subject, lighting, background, colours, mood, style>",
+  "poster": {
+    "palette": "<pick the single best art-directed fit from exactly these ids: ${PALETTE_IDS.join(', ')}>",
+    "layout": "<one of: ${POSTER_LAYOUTS.join(' | ')} — pick what suits the post type>",
+    "kicker": "<=28 chars, small chip label for this specific post>",
+    "headline": "<=26 chars, punchy English display headline — concrete, not generic>",
+    "sub": "<=80 chars English supporting line that adds context or emotion>",
+    "offer_text": "<=24 chars CTA pill naming the owner's actual offer, or '' if none was given>"
+  },
+  "caption": "<English: specific scroll-stopping hook>[BREAK][BREAK]<2-3 sentence body with concrete sensory/emotional detail about THIS product>[BREAK][BREAK]<clear CTA>",
+  "caption_b": "<A/B challenger with a DIFFERENT hook style — much shorter and punchier, or a question hook — then body and CTA, also in English>",
+  "hashtags": ["<12-15 English hashtags: category tags and local-city tags>"],
+  "first_comment": "<engaging question in English to pin as the first comment>",
+  "story_idea": "<15-30 second companion Story concept in English>",
+  "best_time": "<specific day + time IST to post on ${platform} for this category>",
+  "whatsapp_message": "<=280 chars, English message with emoji, ready to forward on WhatsApp — only mention an offer if the owner gave one>",
   "reply_templates": [
-    {"trigger":"How much does it cost?","reply":"<reply>"},
-    {"trigger":"Where can I buy?","reply":"<reply>"},
-    {"trigger":"Is it available online?","reply":"<reply>"},
-    {"trigger":"Looks amazing!","reply":"<reply>"}
-  ]
+    {"trigger": "<typical customer DM, e.g. 'What's the price?>", "reply": "<warm, helpful reply in English>"},
+    {"trigger": "<e.g. 'Do you deliver?>", "reply": "<reply in English — if the owner didn't state delivery, suggest they reply with their own detail>"},
+    {"trigger": "<e.g. 'Where is your shop?>", "reply": "<reply in English>"},
+    {"trigger": "<e.g. 'Any discount?>", "reply": "<reply in English — never invent a discount; suggest asking the owner if none was stated>"}
+  ],
+  "image_prompt": "<at least 50 words, extremely detailed image-generation prompt: exact subject, styling, lighting, background, colours, mood, composition, camera feel — tuned to the product>"
 }`;
 
-    const res = await groq.chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-      max_tokens: 2000,
-      temperature: 0.8,
+    // Single pass (the old 3-call refine chain tripled latency and its
+    // editor step could rewrite English copy into Hindi). The editor bar
+    // is folded into the system prompt above.
+    const raw = await chatJSON<PostResult>({
+      system: systemPrompt,
+      user: userPrompt,
+      temperature: 0.85,
+      maxTokens: 2600,
     });
 
-    const raw = res.choices[0]?.message?.content || '';
-    let cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-    const s = cleaned.indexOf('{'), e = cleaned.lastIndexOf('}');
-    if (s === -1 || e === -1) throw new Error('Model did not return valid JSON. Please try again.');
-    cleaned = cleaned.slice(s, e + 1);
-    cleaned = cleaned.replace(/[\r\n\t]/g, ' ').replace(/\s{2,}/g, ' ');
-    const data = JSON.parse(cleaned);
-    if (data.caption) data.caption = data.caption.replace(/\[BREAK\]/g, '\n');
+    // ── Coerce / validate poster fields ───────────────────────────
+    const oneLine = (v: unknown, max: number): string =>
+      typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '';
 
-    // ── Together AI image generation ──────────────────────────────
-    let imageUrl: string | null = null;
+    const p = raw.poster ?? {};
+    const palette = PALETTE_IDS.includes(p.palette ?? '') ? (p.palette as string) : 'diwaliMaroon';
+    const layout = (POSTER_LAYOUTS as readonly string[]).includes(p.layout ?? '') ? (p.layout as string) : 'modern';
+    const poster = {
+      palette,
+      layout,
+      kicker: oneLine(p.kicker, 30),
+      headline: oneLine(p.headline, 28) || businessName.slice(0, 24),
+      sub: oneLine(p.sub, 90),
+      offer_text: oneLine(p.offer_text, 26),
+    };
+
+    const hashtags: string[] = Array.isArray(raw.hashtags)
+      ? raw.hashtags
+          .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+          .map((t) => t.trim())
+          .slice(0, 30)
+      : [];
+
+    const replyTemplates = Array.isArray(raw.reply_templates)
+      ? raw.reply_templates
+          .filter((r): r is { trigger: string; reply: string } =>
+            !!r && typeof r === 'object' && typeof r.trigger === 'string' && typeof r.reply === 'string')
+          .map((r) => ({
+            trigger: r.trigger.trim().slice(0, 200),
+            reply: r.reply.trim().slice(0, 1000),
+          }))
+          .slice(0, 8)
+      : [];
+
+    // ── AI background image (optional bonus — never fatal) ──────────
+    let image_url: string | null = null;
     const tk = process.env.TOGETHER_API_KEY;
+    const keyLooksReal = !!tk && tk.length > 10 && !tk.includes('your_') && !tk.includes('placeholder');
+    const imagePrompt =
+      oneLine(raw.image_prompt, 800) ||
+      `${customPrompt || productDescription}, premium brand photography, professional studio lighting, ultra high quality, 4K`;
 
-    console.log('[generate-post] TOGETHER_API_KEY present:', !!tk);
-    console.log('[generate-post] Key prefix:', tk?.slice(0, 10));
-
-    if (tk && tk.length > 10 && !tk.includes('your_') && !tk.includes('placeholder')) {
+    if (keyLooksReal && tk) {
       try {
-        const imagePrompt = data.image_prompt ||
-          `${customPrompt || productDescription}, luxury brand photography, professional studio lighting, ultra high quality, 4K`;
-
-        console.log('[generate-post] Sending image prompt to Together AI:', imagePrompt.slice(0, 100));
-
         const ir = await fetch('https://api.together.xyz/v1/images/generations', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${tk}`,
+            Authorization: `Bearer ${tk}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -137,30 +188,42 @@ Return this JSON (use [BREAK] not real newlines in strings, headline max 18 char
             steps: 4,
             n: 1,
           }),
+          // Optional bonus feature — never let a hung image API hang the route.
+          signal: AbortSignal.timeout(30000),
         });
-
-        console.log('[generate-post] Together AI status:', ir.status);
-
         if (ir.ok) {
-          const id = await ir.json();
-          imageUrl = id.data?.[0]?.url || id.data?.[0]?.b64_json ? `data:image/png;base64,${id.data[0].b64_json}` : null;
-          console.log('[generate-post] Image URL received:', imageUrl ? 'YES' : 'NO', imageUrl?.slice(0, 50));
-        } else {
-          const errText = await ir.text();
-          console.error('[generate-post] Together AI error:', ir.status, errText.slice(0, 200));
+          const img = (await ir.json()) as TogetherImage;
+          const d = img?.data?.[0];
+          image_url = d?.url ?? (d?.b64_json ? `data:image/png;base64,${d.b64_json}` : null);
         }
-      } catch (imgErr: unknown) {
-        const imgMsg = imgErr instanceof Error ? imgErr.message : 'Unknown image error';
-        console.error('[generate-post] Image generation exception:', imgMsg);
+      } catch {
+        image_url = null;
       }
-    } else {
-      console.log('[generate-post] Together API key not valid, skipping image generation');
     }
 
-    return NextResponse.json({ ...data, imageUrl });
+    if (!image_url) {
+      // Free fallback: Pollinations — no API key needed. The URL generates
+      // the image when the browser loads it, so there is nothing to fail
+      // server-side; if it's down the <img> just stays empty.
+      image_url =
+        `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}` +
+        `?width=1024&height=1024&nologo=true&model=flux&seed=${Math.floor(Math.random() * 99999)}`;
+    }
+
+    return NextResponse.json({
+      poster,
+      caption: oneLine(raw.caption, 2200),
+      caption_b: oneLine(raw.caption_b, 2200),
+      hashtags,
+      first_comment: oneLine(raw.first_comment, 500),
+      story_idea: oneLine(raw.story_idea, 500),
+      best_time: oneLine(raw.best_time, 120),
+      whatsapp_message: oneLine(raw.whatsapp_message, 300),
+      reply_templates: replyTemplates,
+      image_prompt: oneLine(raw.image_prompt, 2000),
+      image_url,
+    });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[generate-post]', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError('generate-post', error);
   }
 }

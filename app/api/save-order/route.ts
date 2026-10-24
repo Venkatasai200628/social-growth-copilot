@@ -1,38 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UserOrder, DayMetric } from '@/lib/types';
+import { readJson, badRequest, serverError } from '../_lib/http';
 
-// Server-side: use Firebase Admin or just return to client to save
-// Since we use client-side Firebase, this route generates the metrics data
+// Returns the day-by-day tracking skeleton for a campaign. GrowMitra does
+// NOT project numbers — every metric is empty until the owner enters real
+// results in Update Metrics.
 export async function POST(req: NextRequest) {
   try {
-    const order: UserOrder = await req.json();
+    const body = await readJson<UserOrder>(req);
+    if (!body) return badRequest('Invalid order — please restart the checkout.');
 
-    // Generate projected metrics for each day based on plan + efficiency
-    const multipliers = { conservative: 0.7, balanced: 1.0, aggressive: 1.5 };
-    const m = multipliers[order.promotionEfficiency] || 1.0;
-    const baseReach = order.planId === 'starter' ? 800 : order.planId === 'growth' ? 2500 : 8000;
+    // Cap the calendar length so a bogus duration can't allocate a huge array.
+    const dur = Math.min(Math.max(parseInt(String(body.duration ?? 14), 10) || 7, 1), 60);
 
-    const metrics: DayMetric[] = Array.from({ length: order.duration || 7 }, (_, i) => {
-      const day = i + 1;
-      const growth = 1 + (day / (order.duration || 7)) * 0.8; // ramp up over campaign
-      const reach = Math.round(baseReach * m * growth * (0.9 + Math.random() * 0.2));
+    const metrics: DayMetric[] = Array.from({ length: dur }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() + i);
-      return {
-        day,
-        date: date.toISOString().split('T')[0],
-        projected: {
-          reach,
-          clicks: Math.round(reach * 0.04 * m),
-          impressions: Math.round(reach * 2.5),
-          conversions: Math.round(reach * 0.008 * m),
-        },
-      };
+      return { day: i + 1, date: date.toISOString().split('T')[0] };
     });
 
     return NextResponse.json({ metrics });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError('save-order', error);
   }
 }

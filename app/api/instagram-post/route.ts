@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth-guard';
+import { readJson, badRequest, friendlyError } from '../_lib/http';
 
 // New Composio SDK: @composio/core v0.8+
 // Dynamic import to avoid build errors if not installed
@@ -14,33 +16,40 @@ async function getComposioClient() {
 
 // POST — publish post to Instagram
 export async function POST(req: NextRequest) {
-  try {
-    const { imageUrl, caption, hashtags } = await req.json();
+  const auth = await requireAuth(req);
+  if (auth instanceof NextResponse) return auth;
 
-    if (!imageUrl) {
+  try {
+    const body = await readJson<{ imageUrl?: string; caption?: string; hashtags?: string[] }>(req);
+    if (!body) return badRequest('Invalid request — please regenerate your post and try again.');
+    const { imageUrl, caption, hashtags } = body;
+
+    if (typeof imageUrl !== 'string' || !imageUrl.trim()) {
       return NextResponse.json({
-        error: 'An image URL is required to post to Instagram. Enable Together AI image generation by adding TOGETHER_API_KEY to .env.local, then regenerate your post.',
+        error: 'An image URL is required to post to Instagram. Enable AI image generation by adding TOGETHER_API_KEY to .env.local, then regenerate your post.',
       }, { status: 400 });
     }
 
-    const fullCaption = hashtags?.length
-      ? `${caption}\n\n${hashtags.join(' ')}`
-      : caption;
+    const tags = Array.isArray(hashtags)
+      ? hashtags.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+      : [];
+    const fullCaption = tags.length
+      ? `${typeof caption === 'string' ? caption : ''}\n\n${tags.join(' ')}`
+      : typeof caption === 'string' ? caption : '';
 
     const client = await getComposioClient();
     const entityId = process.env.COMPOSIO_ENTITY_ID || 'default';
 
     // Execute the Instagram publish action
-    // TO:
-  // @ts-expect-error — composio SDK types don't match runtime API
-const result = await client.tools.execute({
-  slug: 'INSTAGRAM_MEDIA_PUBLISH',
-  connectedAccountId: entityId,
-  input: {
-    image_url: imageUrl,
-    caption: fullCaption,
-  },
-});
+    // @ts-expect-error — composio SDK types don't match runtime API
+    const result = await client.tools.execute({
+      slug: 'INSTAGRAM_MEDIA_PUBLISH',
+      connectedAccountId: entityId,
+      input: {
+        image_url: imageUrl.trim(),
+        caption: fullCaption,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -54,7 +63,7 @@ const result = await client.tools.execute({
 
     if (message.includes('COMPOSIO_API_KEY') || message.includes('not configured')) {
       return NextResponse.json({
-        error: 'Composio not configured. Add COMPOSIO_API_KEY to .env.local — get it from app.composio.dev/settings',
+        error: 'Publishing is not configured yet. Add COMPOSIO_API_KEY to .env.local — get it from app.composio.dev/settings',
       }, { status: 400 });
     }
     if (message.includes('connected account') || message.includes('ConnectedAccount') || message.includes('not found')) {
@@ -68,7 +77,7 @@ const result = await client.tools.execute({
       }, { status: 400 });
     }
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: friendlyError(error) }, { status: 500 });
   }
 }
 
@@ -98,6 +107,6 @@ export async function GET() {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[instagram-check]', message);
-    return NextResponse.json({ connected: false, reason: 'error', detail: message });
+    return NextResponse.json({ connected: false, reason: 'error', detail: friendlyError(err) });
   }
 }

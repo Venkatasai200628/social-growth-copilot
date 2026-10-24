@@ -2,16 +2,9 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, ArrowLeft, ChevronDown, Zap, Gauge, Flame } from 'lucide-react';
-import { PLANS } from '@/lib/plans';
+import { ArrowRight, ArrowLeft, ChevronDown, Zap, Gauge, Flame, Lock } from 'lucide-react';
+import { CATEGORIES } from '@/lib/types';
 import AuthGuard from '@/app/components/AuthGuard';
-
-const categories = [
-  'Food & Beverage', 'Fashion & Clothing', 'Tech Startup', 'Events & Hackathons',
-  'Real Estate', 'Education & Courses', 'Healthcare & Wellness', 'Gold & Jewellery',
-  'Grocery & FMCG', 'Beauty & Makeup', 'B2B Services', 'Local Business',
-  'Fitness & Gym', 'Travel & Tourism', 'Entertainment', 'Other',
-];
 
 const goals = [
   'Brand Awareness', 'Drive Sales / Conversions', 'Generate Leads',
@@ -45,8 +38,6 @@ const efficiencyOptions = [
 function OnboardContent() {
   const router = useRouter();
   const params = useSearchParams();
-  const planId = params.get('plan') || 'growth';
-  const plan = PLANS.find((p) => p.id === planId) || PLANS[1];
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -55,11 +46,13 @@ function OnboardContent() {
     productDescription: '',
     targetAudience: '',
     goal: '',
+    budget: '',
+    duration: '14',
     websiteUrl: '',
     videoUrl: '',
     contactEmail: '',
     promotionEfficiency: 'balanced' as 'conservative' | 'balanced' | 'aggressive',
-    platforms: plan.platforms,
+    platforms: ['Instagram', 'WhatsApp', 'Facebook'],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -84,87 +77,91 @@ function OnboardContent() {
 
   const proceed = () => {
     if (!validate(step)) return;
-    const encoded = encodeURIComponent(JSON.stringify({ ...form, planId, price: plan.price, duration: plan.duration, planName: plan.name }));
-    router.push(`/checkout?data=${encoded}`);
+    const payload = {
+      ...form,
+      budget: Number(form.budget) || 0,
+      duration: Number(form.duration) || 14,
+    };
+    sessionStorage.setItem('gm_pending_campaign', JSON.stringify(payload));
+    router.push('/checkout');
   };
 
   const F = (label: string, key: keyof typeof form, placeholder: string, type = 'text') => (
     <div>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{label}</label>
+      <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">{label}</label>
       <input
         type={type}
         placeholder={placeholder}
         value={form[key] as string}
         onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-        className="w-full bg-white/[0.03] border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none text-sm transition-colors"
-        style={{ borderColor: errors[key] ? '#ef4444' : 'rgba(255,255,255,0.08)' }}
+        className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none text-sm transition-colors"
+        style={{ borderColor: errors[key] ? 'var(--danger)' : 'var(--input-border)' }}
       />
-      {errors[key] && <p className="text-red-400 text-xs mt-1">{errors[key]}</p>}
+      {errors[key] && <p className="text-[var(--danger)] text-xs mt-1">{errors[key]}</p>}
     </div>
   );
 
   return (
     <main className="min-h-screen relative overflow-hidden">
-      <div className="orb w-[500px] h-[500px] bg-violet-600/12 top-[-150px] right-[-100px]" />
+      <div className="orb w-[500px] h-[500px] bg-[var(--accent)]/12 top-[-150px] right-[-100px]" />
       <div className="relative z-10 max-w-2xl mx-auto px-6 py-14">
 
         {/* Back */}
-        <button onClick={() => router.push('/')} className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-300 text-sm transition-colors mb-8">
-          <ArrowLeft size={14} /> Back to Plans
+        <button onClick={() => router.push('/')} className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] text-sm transition-colors mb-8">
+          <ArrowLeft size={14} /> Back to Home
         </button>
 
-        {/* Plan badge */}
-        <div className="flex items-center gap-3 mb-8 bg-[#16161f] border border-white/[0.06] rounded-2xl p-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: plan.accentColor, border: `1px solid ${plan.color}30` }}>
-            <Zap size={16} style={{ color: plan.color }} />
+        {/* Step header */}
+        <div className="flex items-center gap-3 mb-8 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
+            <Zap size={16} className="text-[var(--accent-soft)]" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-bold text-white">{plan.name} Plan — ₹{plan.price.toLocaleString('en-IN')}</div>
-            <div className="text-xs text-slate-500">{plan.duration}-day campaign · {plan.platforms.length} platforms</div>
+            <div className="text-sm font-bold text-[var(--text)]">New campaign setup</div>
+            <div className="text-xs text-[var(--text-muted)]">AI strategy, content calendar &amp; daily tracking</div>
           </div>
-          <div className="text-xs font-bold px-3 py-1 rounded-full" style={{ background: plan.accentColor, color: plan.color }}>
+          <div className="text-xs font-bold px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--accent-soft)]">
             Step {step} of 3
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="h-1 bg-white/[0.06] rounded-full mb-8 overflow-hidden">
+        <div className="h-1 bg-[var(--border)] rounded-full mb-8 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${(step / 3) * 100}%`, background: plan.color }} />
+            style={{ width: `${(step / 3) * 100}%`, background: 'var(--accent)' }} />
         </div>
 
-        <div className="bg-[#16161f] border border-white/[0.06] rounded-3xl p-8">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-8">
 
           {/* Step 1 — Business Info */}
           {step === 1 && (
             <div className="space-y-5">
-              <h2 className="text-2xl font-light text-white mb-6" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
+              <h2 className="font-display text-3xl font-bold text-[var(--text)] mb-6">
                 Tell us about your business
               </h2>
               {F('Business / Brand Name *', 'businessName', 'e.g. Priya Gold House, TechLaunch, Biryani by Spice...')}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Category *</label>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Category *</label>
                 <div className="relative">
                   <select value={form.businessCategory}
                     onChange={(e) => setForm({ ...form, businessCategory: e.target.value })}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white focus:outline-none text-sm appearance-none"
-                    style={{ borderColor: errors.businessCategory ? '#ef4444' : undefined }}>
-                    <option value="" className="bg-[#16161f]">Select category...</option>
-                    {categories.map((c) => <option key={c} value={c} className="bg-[#16161f]">{c}</option>)}
+                    className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none text-sm appearance-none"
+                    style={{ borderColor: errors.businessCategory ? 'var(--danger)' : 'var(--input-border)' }}>
+                    <option value="" className="bg-[var(--card)]">Select category...</option>
+                    {CATEGORIES.map((c) => <option key={c.value} value={c.value} className="bg-[var(--card)]">{c.emoji} {c.label}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
                 </div>
-                {errors.businessCategory && <p className="text-red-400 text-xs mt-1">{errors.businessCategory}</p>}
+                {errors.businessCategory && <p className="text-[var(--danger)] text-xs mt-1">{errors.businessCategory}</p>}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Describe your product / service *</label>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Describe your product / service *</label>
                 <textarea rows={3} placeholder="What exactly are you selling? What makes it unique? Any offers or USPs?"
                   value={form.productDescription}
                   onChange={(e) => setForm({ ...form, productDescription: e.target.value })}
-                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none text-sm resize-none"
-                  style={{ borderColor: errors.productDescription ? '#ef4444' : undefined }} />
-                {errors.productDescription && <p className="text-red-400 text-xs mt-1">{errors.productDescription}</p>}
+                  className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none text-sm resize-none"
+                  style={{ borderColor: errors.productDescription ? 'var(--danger)' : 'var(--input-border)' }} />
+                {errors.productDescription && <p className="text-[var(--danger)] text-xs mt-1">{errors.productDescription}</p>}
               </div>
               {F('Contact Email *', 'contactEmail', 'you@yourbusiness.com', 'email')}
               {F('Website URL', 'websiteUrl', 'https://yourbusiness.com (optional)')}
@@ -175,36 +172,62 @@ function OnboardContent() {
           {/* Step 2 — Campaign Details */}
           {step === 2 && (
             <div className="space-y-5">
-              <h2 className="text-2xl font-light text-white mb-6" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
+              <h2 className="font-display text-3xl font-bold text-[var(--text)] mb-6">
                 Campaign details
               </h2>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Target Audience *</label>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Target Audience *</label>
                 <textarea rows={2} placeholder="Who are your ideal customers? Age, location, interests, income level..."
                   value={form.targetAudience}
                   onChange={(e) => setForm({ ...form, targetAudience: e.target.value })}
-                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none text-sm resize-none"
-                  style={{ borderColor: errors.targetAudience ? '#ef4444' : undefined }} />
-                {errors.targetAudience && <p className="text-red-400 text-xs mt-1">{errors.targetAudience}</p>}
+                  className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none text-sm resize-none"
+                  style={{ borderColor: errors.targetAudience ? 'var(--danger)' : 'var(--input-border)' }} />
+                {errors.targetAudience && <p className="text-[var(--danger)] text-xs mt-1">{errors.targetAudience}</p>}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Primary Goal *</label>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Primary Goal *</label>
                 <div className="relative">
                   <select value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })}
-                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-4 py-3 text-white focus:outline-none text-sm appearance-none"
-                    style={{ borderColor: errors.goal ? '#ef4444' : undefined }}>
-                    <option value="" className="bg-[#16161f]">Select goal...</option>
-                    {goals.map((g) => <option key={g} value={g} className="bg-[#16161f]">{g}</option>)}
+                    className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none text-sm appearance-none"
+                    style={{ borderColor: errors.goal ? 'var(--danger)' : 'var(--input-border)' }}>
+                    <option value="" className="bg-[var(--card)]">Select goal...</option>
+                    {goals.map((g) => <option key={g} value={g} className="bg-[var(--card)]">{g}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
                 </div>
-                {errors.goal && <p className="text-red-400 text-xs mt-1">{errors.goal}</p>}
+                {errors.goal && <p className="text-[var(--danger)] text-xs mt-1">{errors.goal}</p>}
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Total budget (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="5000 (0 = organic only)"
+                    value={form.budget}
+                    onChange={(e) => setForm({ ...form, budget: e.target.value })}
+                    className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none text-sm transition-colors"
+                    style={{ borderColor: 'var(--input-border)' }}
+                  />
+                  <p className="text-[var(--text-faint)] text-xs mt-1.5">Only used for budget splits — never shown as a result promise.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-2">Duration</label>
+                  <div className="relative">
+                    <select value={form.duration}
+                      onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                      className="w-full bg-[var(--input-bg)] border rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none text-sm appearance-none"
+                      style={{ borderColor: 'var(--input-border)' }}>
+                      {['7', '10', '14'].map((d) => <option key={d} value={d}>{d} days</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                  </div>
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Platforms to promote on</label>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-3">Platforms to promote on</label>
                 <div className="flex flex-wrap gap-2">
                   {['Instagram', 'Facebook', 'Twitter/X', 'LinkedIn', 'YouTube', 'WhatsApp'].map((p) => {
-                    const available = plan.platforms.includes(p);
+                    const available = true;
                     const selected = form.platforms.includes(p);
                     return (
                       <button key={p} disabled={!available}
@@ -212,17 +235,17 @@ function OnboardContent() {
                           ...prev,
                           platforms: selected ? prev.platforms.filter((x) => x !== p) : [...prev.platforms, p],
                         }))}
-                        className={`text-xs px-3 py-2 rounded-xl border font-medium transition-all ${
-                          !available ? 'opacity-30 cursor-not-allowed bg-white/[0.02] border-white/[0.05] text-slate-600'
-                          : selected ? 'border-violet-500/40 text-violet-300 bg-violet-600/20'
-                          : 'bg-white/[0.03] border-white/[0.08] text-slate-500 hover:border-white/[0.15]'
+                        className={`inline-flex items-center text-xs px-3 py-2 rounded-xl border font-medium transition-all ${
+                          !available ? 'opacity-50 cursor-not-allowed bg-[var(--bg-alt)] border-[var(--border)] text-[var(--text-faint)]'
+                          : selected ? 'border-[var(--accent)]/40 text-[var(--accent-soft)] bg-[var(--accent)]/20'
+                          : 'bg-[var(--input-bg)] border-[var(--input-border)] text-[var(--text-muted)] hover:border-[var(--accent)]/30'
                         }`}>
-                        {p}{!available && ' 🔒'}
+                        {p}{!available && <Lock size={10} className="ml-1" />}
                       </button>
                     );
                   })}
                 </div>
-                <p className="text-xs text-slate-600 mt-2">Locked platforms available in higher plans</p>
+                
               </div>
             </div>
           )}
@@ -230,10 +253,10 @@ function OnboardContent() {
           {/* Step 3 — Promotion Intensity */}
           {step === 3 && (
             <div>
-              <h2 className="text-2xl font-light text-white mb-2" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
+              <h2 className="font-display text-3xl font-bold text-[var(--text)] mb-2">
                 How aggressive should we promote?
               </h2>
-              <p className="text-slate-500 text-sm mb-8">This tells our AI how to allocate your budget and build your strategy.</p>
+              <p className="text-[var(--text-muted)] text-sm mb-8">This tells our AI how to allocate your budget and build your strategy.</p>
               <div className="space-y-4">
                 {efficiencyOptions.map(({ id, icon: Icon, label, desc, color }) => {
                   const selected = form.promotionEfficiency === id;
@@ -241,8 +264,8 @@ function OnboardContent() {
                     <button key={id} onClick={() => setForm({ ...form, promotionEfficiency: id as typeof form.promotionEfficiency })}
                       className="w-full text-left p-5 rounded-2xl border transition-all flex items-start gap-4"
                       style={{
-                        background: selected ? `${color}10` : 'rgba(255,255,255,0.02)',
-                        borderColor: selected ? `${color}50` : 'rgba(255,255,255,0.06)',
+                        background: selected ? `${color}10` : 'var(--bg-alt)',
+                        borderColor: selected ? `${color}50` : 'var(--border)',
                         boxShadow: selected ? `0 0 20px ${color}15` : 'none',
                       }}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
@@ -250,13 +273,13 @@ function OnboardContent() {
                         <Icon size={18} style={{ color }} />
                       </div>
                       <div className="flex-1">
-                        <div className="font-bold text-white text-sm mb-1" style={{ fontFamily: 'Cormorant Garamond, serif', color: selected ? color : undefined }}>
+                        <div className="font-display font-bold text-base mb-1 text-[var(--text)]" style={{ color: selected ? color : undefined }}>
                           {label}
                         </div>
-                        <div className="text-slate-400 text-xs leading-relaxed">{desc}</div>
+                        <div className="text-[var(--text-muted)] text-xs leading-relaxed">{desc}</div>
                       </div>
                       <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1"
-                        style={{ borderColor: selected ? color : 'rgba(255,255,255,0.15)' }}>
+                        style={{ borderColor: selected ? color : 'var(--text-faint)' }}>
                         {selected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />}
                       </div>
                     </button>
@@ -270,21 +293,21 @@ function OnboardContent() {
           <div className="flex gap-3 mt-8">
             {step > 1 && (
               <button onClick={back}
-                className="flex-1 py-3.5 rounded-2xl font-bold text-sm border border-white/[0.08] text-slate-400 hover:border-white/[0.15] transition-all flex items-center justify-center gap-2">
+                className="flex-1 py-3.5 rounded-full font-medium text-sm border border-[var(--input-border)] text-[var(--text-muted)] hover:border-[var(--accent)]/40 hover:text-[var(--text)] transition-all flex items-center justify-center gap-2">
                 <ArrowLeft size={14} /> Back
               </button>
             )}
             {step < 3 ? (
               <button onClick={next}
-                className="flex-1 py-3.5 rounded-2xl font-bold text-sm text-white transition-all flex items-center justify-center gap-2"
-                style={{ background: plan.color, fontFamily: 'Cormorant Garamond, serif' }}>
+                className="flex-1 py-3.5 rounded-full font-bold text-sm text-[#08080d] transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                style={{ background: 'var(--accent)' }}>
                 Next <ArrowRight size={14} />
               </button>
             ) : (
               <button onClick={proceed}
-                className="flex-1 py-3.5 rounded-2xl font-bold text-sm text-[#0a0a0f] transition-all flex items-center justify-center gap-2 hover:opacity-90"
-                style={{ background: plan.color, fontFamily: 'Cormorant Garamond, serif' }}>
-                Proceed to Payment <ArrowRight size={14} />
+                className="flex-1 py-3.5 rounded-full font-bold text-sm text-[#08080d] transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                style={{ background: 'var(--accent)' }}>
+                Continue to Activation <ArrowRight size={14} />
               </button>
             )}
           </div>
@@ -297,7 +320,7 @@ function OnboardContent() {
 export default function OnboardPage() {
   return (
     <AuthGuard>
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500 font-light">Loading...</div>}>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-[var(--text-muted)]">Loading...</div>}>
         <OnboardContent />
       </Suspense>
     </AuthGuard>

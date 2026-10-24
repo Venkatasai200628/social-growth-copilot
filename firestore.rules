@@ -1,22 +1,50 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read/write their own user document
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // ── users/{uid} ────────────────────────────────────────────────────
+    // Profile docs (businessName, category, plan, postsThisMonth, …) are
+    // strictly owner-only. No public read, no anonymous write.
+    // Free beta: plan activation is client-side by design, so the owner may
+    // write their own doc — but nobody else's.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
 
-    // Orders: only the owner can read/write
+    // ── orders/{orderId} ───────────────────────────────────────────────
+    // Writes are owner-only; create must stamp the caller's uid.
+    // Reads: the share page (app/dashboard/[id]/share/page.tsx) fetches a
+    // single order without signing in to render a shared report, so `get`
+    // by document id is public. Ids are uuidv4, making a report viewable
+    // only via its link ("anyone with the link"). `list` (queries) stay
+    // owner-only so no one can enumerate the collection.
     match /orders/{orderId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow get: if true;
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
 
-    // Campaigns: only the owner can read/write
+    // ── campaigns/{campaignId} ─────────────────────────────────────────
+    // Same model as orders: the share page reads one campaign together
+    // with its order without auth, so `get` by id is public; `list` and
+    // all writes are owner-only.
     match /campaigns/{campaignId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow get: if true;
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.userId == request.auth.uid;
     }
+
+    // Any other collection: no allow rule matches → denied by default,
+    // including all anonymous access.
   }
 }

@@ -1,11 +1,63 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Outfit:wght@200;300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&family=Poppins:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Telugu:wght@400;600;700&family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans+Kannada:wght@400;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ─────────────────────────────────────────────
+   Two real themes driven by [data-theme] on <html>. Every shared
+   component reads these; page-level Tailwind classes are mapped
+   for light mode at the bottom of this file. */
 :root {
-  --font-display: 'Cormorant Garamond', Georgia, serif;
-  --font-body: 'Outfit', sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Poppins', 'Segoe UI', sans-serif;
+
+  --bg: #08080d;
+  --bg-alt: #0e0e16;
+  --card: #16161f;
+  --card-hover: #1a1a26;
+  --border: #ffffff0f;
+  --border-soft: #ffffff0a;
+  --text: #e2e8f0;
+  --text-soft: #b6bfcf;
+  --text-muted: #8b95a8;
+  --text-faint: #5c667a;
+  --accent: #8b5cf6;
+  --accent-soft: #a78bfa;
+  --accent-contrast: #ffffff;
+  --neon: #22d3ee;
+  --gold: #f5b942;
+  --success: #34d399;
+  --danger: #f87171;
+  --hover-fill: #ffffff12;
+  --input-bg: #0e0e16;
+  --input-border: #ffffff14;
+  --scroll-track: #08080d;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f6f5fb;
+  --bg-alt: #fbfaff;
+  --card: #ffffff;
+  --card-hover: #f8f6ff;
+  --border: #e6e2f4;
+  --border-soft: #edeaf8;
+  --text: #191a2e;
+  --text-soft: #3f4360;
+  --text-muted: #6a6f8a;
+  --text-faint: #9298b3;
+  --accent: #7c3aed;
+  --accent-soft: #8b5cf6;
+  --accent-contrast: #ffffff;
+  --neon: #0891b2;
+  --gold: #b45309;
+  --success: #059669;
+  --danger: #dc2626;
+  --hover-fill: #7c3aed14;
+  --input-bg: #fbfaff;
+  --input-border: #dcd7f0;
+  --scroll-track: #f6f5fb;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; padding: 0; margin: 0; }
@@ -13,17 +65,20 @@
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
-  background: #08080d;
-  color: #e2e8f0;
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-body);
   font-weight: 300;
   letter-spacing: 0.01em;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #08080d; }
-::-webkit-scrollbar-thumb { background: #7c3aed44; border-radius: 2px; }
+::selection { background: var(--accent); color: var(--accent-contrast); }
 
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; opacity: .5; }
+
+/* film grain */
 body::before {
   content: '';
   position: fixed;
@@ -32,7 +87,6 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
-
 [data-theme="light"] body::before { opacity: 0.4; }
 
 .orb {
@@ -42,36 +96,56 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
+[data-theme="light"] .orb { opacity: 0.25; }
 
-/* ── Typography ─────────────────────────────── */
+/* ── Accessibility ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* ── Typography ────────────────────────────────────────────────── */
 .prose-output { font-family: var(--font-body); line-height: 1.75; font-weight: 300; }
 .prose-output h2 {
   font-family: var(--font-display);
-  font-size: 1.25rem; font-weight: 500; color: #a78bfa;
+  font-size: 1.25rem; font-weight: 600; color: var(--accent-soft);
   margin: 1.5rem 0 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
 }
 .prose-output h3 {
   font-family: var(--font-display);
-  font-size: 1.05rem; font-weight: 400; color: #22d3ee;
+  font-size: 1.05rem; font-weight: 600; color: var(--neon);
   margin: 1.2rem 0 0.4rem; letter-spacing: 0.04em;
 }
 .prose-output h4 {
   font-family: var(--font-body);
-  font-size: 0.88rem; font-weight: 500; color: #f59e0b;
+  font-size: 0.88rem; font-weight: 600; color: var(--gold);
   margin: 1rem 0 0.3rem; letter-spacing: 0.06em; text-transform: uppercase;
 }
-.prose-output p { margin-bottom: 0.7rem; color: #94a3b8; font-size: 0.9rem; }
+.prose-output p { margin-bottom: 0.7rem; color: var(--text-soft); font-size: 0.9rem; }
 .prose-output ul, .prose-output ol { padding-left: 1.4rem; margin-bottom: 0.7rem; }
-.prose-output li { color: #94a3b8; font-size: 0.9rem; margin-bottom: 0.3rem; }
-.prose-output strong { color: #e2e8f0; font-weight: 500; }
-.prose-output em { color: #f59e0b; font-style: normal; font-weight: 400; }
+.prose-output li { color: var(--text-soft); font-size: 0.9rem; margin-bottom: 0.3rem; }
+.prose-output strong { color: var(--text); font-weight: 500; }
+.prose-output em { color: var(--gold); font-style: normal; font-weight: 400; }
+code { font-family: ui-monospace, monospace; }
 
-/* ── Animations ─────────────────────────────── */
+/* ── Animations ────────────────────────────────────────────────── */
 @keyframes slideUp { 0%{opacity:0;transform:translateY(16px)} 100%{opacity:1;transform:translateY(0)} }
 .animate-slide-up { animation: slideUp 0.35s ease-out; }
 
 @keyframes fadeIn { 0%{opacity:0} 100%{opacity:1} }
 .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+@keyframes fadeUp { 0%{opacity:0;transform:translateY(20px)} 100%{opacity:1;transform:translateY(0)} }
+.animate-fade-up { animation: fadeUp 0.5s ease-out both; }
+.delay-1 { animation-delay: .08s } .delay-2 { animation-delay: .16s }
+.delay-3 { animation-delay: .24s } .delay-4 { animation-delay: .32s }
+.delay-5 { animation-delay: .4s }
 
 @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
 .animate-float { animation: float 3s ease-in-out infinite; }
@@ -82,71 +156,111 @@ body::before {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
-
-/* ── Line clamp ─────────────────────────────── */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+[data-theme="light"] .shimmer {
+  background: linear-gradient(90deg,#ece9ff 25%,#e0dbff 50%,#ece9ff 75%);
+  background-size: 200% 100%;
 }
 
-/* ── Light Mode ─────────────────────────────── */
-[data-theme="light"] {
-  color-scheme: light;
-}
-[data-theme="light"] body {
-  background: #f4f3ff !important;
-  color: #1a1a2e !important;
-}
-[data-theme="light"] ::-webkit-scrollbar-track { background: #f4f3ff; }
-[data-theme="light"] .orb { opacity: 0.25; }
-[data-theme="light"] .bg-\[\#16161f\] { background: #ffffff !important; }
-[data-theme="light"] .bg-\[\#08080d\] { background: #f4f3ff !important; }
-[data-theme="light"] .bg-\[\#0e0e16\] { background: #f9f8ff !important; }
-[data-theme="light"] .bg-white\/\[0\.02\],
-[data-theme="light"] .bg-white\/\[0\.03\],
-[data-theme="light"] .bg-white\/\[0\.04\],
-[data-theme="light"] .bg-white\/\[0\.05\] { background: #f9f8ff !important; }
-[data-theme="light"] .border-white\/\[0\.06\],
-[data-theme="light"] .border-white\/\[0\.07\],
-[data-theme="light"] .border-white\/\[0\.08\] { border-color: #e5e3f5 !important; }
-[data-theme="light"] .border-white\/\[0\.04\],
-[data-theme="light"] .border-white\/\[0\.05\] { border-color: #ece9ff !important; }
-[data-theme="light"] .text-white { color: #1a1a2e !important; }
-[data-theme="light"] .text-slate-200 { color: #374151 !important; }
-[data-theme="light"] .text-slate-300 { color: #4b5563 !important; }
-[data-theme="light"] .text-slate-400 { color: #6b7280 !important; }
-[data-theme="light"] .text-slate-500 { color: #9ca3af !important; }
-[data-theme="light"] .text-slate-600 { color: #b0b7c3 !important; }
-[data-theme="light"] .text-slate-700 { color: #c4cdd9 !important; }
+/* ── Line clamp ────────────────────────────────────────────────── */
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── Light-mode mapping for the dark-first Tailwind grammar ────── */
+[data-theme="light"] body { background: var(--bg); color: var(--text); }
+[data-theme="light"] .bg-\[\#16161f\] { background: var(--card) !important; }
+[data-theme="light"] .bg-\[\#08080d\] { background: var(--bg) !important; }
+[data-theme="light"] .bg-\[\#08080d\]\/98 { background: var(--bg) !important; }
+[data-theme="light"] .bg-\[\#0e0e16\] { background: var(--bg-alt) !important; }
+[data-theme="light"] .bg-\[\#1e1e2e\] { background: #edeaf8 !important; }
+[data-theme="light"] .bg-white\/\[0\.0[2-9]\],
+[data-theme="light"] .bg-white\/\[0\.1\] { background: var(--bg-alt) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.0[4-9]\]:hover { background: var(--hover-fill) !important; }
+[data-theme="light"] .border-white\/\[0\.0[4-9]\],
+[data-theme="light"] .border-white\/\[0\.1\] { border-color: var(--border) !important; }
+[data-theme="light"] .text-white { color: var(--text) !important; }
 [data-theme="light"] .text-white\/30,
-[data-theme="light"] .text-white\/40 { color: rgba(26,26,46,0.25) !important; }
+[data-theme="light"] .text-white\/40,
+[data-theme="light"] .text-white\/50,
+[data-theme="light"] .text-white\/60 { color: color-mix(in srgb, var(--text) 55%, transparent) !important; }
+[data-theme="light"] .text-white\/70 { color: color-mix(in srgb, var(--text) 70%, transparent) !important; }
+[data-theme="light"] .text-slate-200 { color: #2c2f4a !important; }
+[data-theme="light"] .text-slate-300 { color: #374151 !important; }
+[data-theme="light"] .text-slate-400 { color: #4b5563 !important; }
+[data-theme="light"] .text-slate-500 { color: #6b7280 !important; }
+[data-theme="light"] .text-slate-600 { color: #4b5563 !important; }
+[data-theme="light"] .text-slate-700 { color: #374151 !important; }
+[data-theme="light"] .bg-black\/20 { background: #ece9f7 !important; }
+[data-theme="light"] .border-slate-700 { border-color: var(--border) !important; }
+[data-theme="light"] .bg-slate-800 { background: #edeaf8 !important; }
 [data-theme="light"] input,
 [data-theme="light"] select,
 [data-theme="light"] textarea {
-  background: #f9f8ff !important;
-  color: #1a1a2e !important;
-  border-color: #ddd8f8 !important;
+  background: var(--input-bg) !important;
+  color: var(--text) !important;
+}
+/* no !important: inline error borders (onboard) must still win */
+[data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea {
+  border-color: var(--input-border);
 }
 [data-theme="light"] input::placeholder,
-[data-theme="light"] textarea::placeholder { color: #c4b5fd !important; }
+[data-theme="light"] textarea::placeholder { color: #a8a0c9 !important; }
 [data-theme="light"] select option { background: #ffffff !important; color: #1a1a2e !important; }
 [data-theme="light"] nav {
-  background: rgba(244,243,255,0.96) !important;
-  border-bottom-color: #e5e3f5 !important;
+  background: color-mix(in srgb, var(--bg) 96%, transparent) !important;
+  border-bottom-color: var(--border) !important;
 }
-[data-theme="light"] .shimmer {
-  background: linear-gradient(90deg,#ece9ff 25%,#e0dbff 50%,#ece9ff 75%) !important;
-  background-size: 200% 100% !important;
-}
-[data-theme="light"] .prose-output p,
-[data-theme="light"] .prose-output li { color: #374151 !important; }
-[data-theme="light"] .prose-output strong { color: #1a1a2e !important; }
 [data-theme="light"] code { background: rgba(124,58,237,0.1) !important; color: #7c3aed !important; }
+[data-theme="light"] .bg-gradient-to-b,
+[data-theme="light"] .bg-gradient-to-t,
+[data-theme="light"] .bg-gradient-to-r { filter: saturate(.9); }
+
+/* ── var()+opacity compat ─────────────────────────────────────────
+   Tailwind 3.4 cannot attach an opacity modifier to a var() color:
+   bg-[var(--accent)]/10 generates NO css at all. These plain rules
+   reproduce those utilities with color-mix so existing markup and
+   the shared ui.tsx primitives render as designed in both themes. */
+.bg-\[var\(--accent\)\]\/10 { background-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+.bg-\[var\(--accent\)\]\/12 { background-color: color-mix(in srgb, var(--accent) 12%, transparent); }
+.bg-\[var\(--accent\)\]\/15 { background-color: color-mix(in srgb, var(--accent) 15%, transparent); }
+.bg-\[var\(--accent\)\]\/20 { background-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.bg-\[var\(--accent\)\]\/8 { background-color: color-mix(in srgb, var(--accent) 8%, transparent); }
+.bg-\[var\(--card\)\]\/40 { background-color: color-mix(in srgb, var(--card) 40%, transparent); }
+.bg-\[var\(--danger\)\]\/10 { background-color: color-mix(in srgb, var(--danger) 10%, transparent); }
+.bg-\[var\(--danger\)\]\/15 { background-color: color-mix(in srgb, var(--danger) 15%, transparent); }
+.bg-\[var\(--danger\)\]\/6 { background-color: color-mix(in srgb, var(--danger) 6%, transparent); }
+.bg-\[var\(--danger\)\]\/8 { background-color: color-mix(in srgb, var(--danger) 8%, transparent); }
+.bg-\[var\(--gold\)\]\/8 { background-color: color-mix(in srgb, var(--gold) 8%, transparent); }
+.bg-\[var\(--neon\)\]\/6 { background-color: color-mix(in srgb, var(--neon) 6%, transparent); }
+.bg-\[var\(--neon\)\]\/8 { background-color: color-mix(in srgb, var(--neon) 8%, transparent); }
+.bg-\[var\(--success\)\]\/10 { background-color: color-mix(in srgb, var(--success) 10%, transparent); }
+.bg-\[var\(--success\)\]\/12 { background-color: color-mix(in srgb, var(--success) 12%, transparent); }
+.border-\[var\(--accent\)\]\/15 { border-color: color-mix(in srgb, var(--accent) 15%, transparent); }
+.border-\[var\(--accent\)\]\/20 { border-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.border-\[var\(--accent\)\]\/25 { border-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.border-\[var\(--accent\)\]\/30 { border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.border-\[var\(--accent\)\]\/40 { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.border-\[var\(--danger\)\]\/15 { border-color: color-mix(in srgb, var(--danger) 15%, transparent); }
+.border-\[var\(--danger\)\]\/20 { border-color: color-mix(in srgb, var(--danger) 20%, transparent); }
+.border-\[var\(--danger\)\]\/40 { border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.border-\[var\(--gold\)\]\/20 { border-color: color-mix(in srgb, var(--gold) 20%, transparent); }
+.border-\[var\(--gold\)\]\/25 { border-color: color-mix(in srgb, var(--gold) 25%, transparent); }
+.border-\[var\(--success\)\]\/25 { border-color: color-mix(in srgb, var(--success) 25%, transparent); }
+.border-\[var\(--success\)\]\/30 { border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+.border-\[var\(--success\)\]\/35 { border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+.hover\:bg-\[var\(--accent\)\]\/20:hover { background-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.hover\:bg-\[var\(--danger\)\]\/25:hover { background-color: color-mix(in srgb, var(--danger) 25%, transparent); }
+.hover\:bg-\[var\(--danger\)\]\/8:hover { background-color: color-mix(in srgb, var(--danger) 8%, transparent); }
+.hover\:border-\[var\(--accent\)\]\/40:hover { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.hover\:border-\[var\(--accent\)\]\/30:hover { border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.hover\:shadow-\[var\(--accent\)\]\/35:hover { --tw-shadow-color: color-mix(in srgb, var(--accent) 35%, transparent); --tw-shadow: var(--tw-shadow-colored); }
+.shadow-\[var\(--accent\)\]\/25 { --tw-shadow-color: color-mix(in srgb, var(--accent) 25%, transparent); --tw-shadow: var(--tw-shadow-colored); }
+.text-\[var\(--text\)\]\/10 { color: color-mix(in srgb, var(--text) 10%, transparent); }
+.text-\[var\(--text\)\]\/60 { color: color-mix(in srgb, var(--text) 60%, transparent); }
+
+/* ── Light-mode contrast guards ───────────────────────────────────
+   .text-white is remapped to dark text above, but on accent-gradient
+   fills the label must stay white in both themes. hover:text-white
+   would also flash invisible on light surfaces. */
+[data-theme="light"] .text-white[class*="linear-gradient"],
+[data-theme="light"] .text-white[style*="linear-gradient"] { color: var(--accent-contrast) !important; }
+[data-theme="light"] .hover\:text-white:hover { color: var(--text) !important; }

@@ -1,0 +1,422 @@
+/**
+ * GrowMitra promo video renderer — builds a real, downloadable video file
+ * (MP4/WebM via MediaRecorder) entirely in the browser:
+ *   1. Scene images come from the owner's own photos (spec.photos, in
+ *      order), with AI stills from our own /api/scene-image route (Gemini
+ *      when the owner added a key, free fallback otherwise) filling the rest.
+ *   2. Scenes animate on a canvas (Ken-Burns zoom, slide-in text overlays).
+ *   3. canvas.captureStream() + MediaRecorder produces the file; an optional
+ *      AI voiceover (via /api/tts) is decoded and mixed into the audio track.
+ */
+
+import { authFetch } from '@/lib/client';
+
+export interface VideoScene {
+  /**
+   * Visual prompt for this scene (screenplay visual line + product context)
+   * — turned into an image at render time via our /api/scene-image route.
+   * Omitted (or a failed fetch) → animated gradient scene.
+   */
+  imagePrompt?: string;
+  /** Big text for this scene (already in the owner's language). */
+  title: string;
+  /** Smaller supporting line. */
+  subtitle?: string;
+}
+
+/** AI narration mixed into the video's audio track. */
+export interface VoiceoverSpec {
+  /** Narration text (callers clamp to ~500 chars; the API allows 600). */
+  text: string;
+  /** App language id — the app is English-only, so this is always 'english'. */
+  language: string;
+  voice?: 'female' | 'male';
+}
+
+export interface VideoSpec {
+  scenes: VideoScene[];
+  businessName: string;
+  /** Final frame text, e.g. the offer / CTA. */
+  cta: string;
+  /** Poster palette id for the color language. */
+  paletteId?: string;
+  /** Seconds per scene (default 2.5). */
+  secondsPerScene?: number;
+  /**
+   * The owner's own photos (JPEG dataURLs) mapped to scenes IN ORDER —
+   * scene i uses photos[i] when present, else the scene's AI image.
+   */
+  photos?: (string | null)[];
+  /** AI voiceover narration; null/omitted renders a silent video. */
+  voiceover?: VoiceoverSpec | null;
+}
+
+export interface RenderResult {
+  url: string;
+  mimeType: string;
+  durationSec: number;
+  width: number;
+  height: number;
+}
+
+const W = 1080;
+const H = 1920; // 9:16 — reels/shorts format, where this video will live
+
+function paletteOf(id?: string) {
+  // Minimal local palette map (kept independent from lib/poster for tree-shaking clarity)
+  const map: Record<string, { bg1: string; bg2: string; ink: string; sub: string; accent: string; accent2: string }> = {
+    diwaliMaroon: { bg1: '#2b0a0a', bg2: '#120303', ink: '#ffe9c2', sub: '#d9b98a', accent: '#f5c04a', accent2: '#ff8b3d' },
+    royalGold:    { bg1: '#141414', bg2: '#000000', ink: '#f7f0dd', sub: '#cbb98a', accent: '#d4af37', accent2: '#f1dd8f' },
+    tealLuxe:     { bg1: '#042f2b', bg2: '#01100e', ink: '#ecfffb', sub: '#a7e8df', accent: '#2dd4bf', accent2: '#fbbf24' },
+    bakeryWarm:   { bg1: '#4a2c2a', bg2: '#1e0f0e', ink: '#fff6ec', sub: '#e8cda8', accent: '#ffb347', accent2: '#ffe0b3' },
+    kitchenSpice: { bg1: '#2a0f0a', bg2: '#120604', ink: '#fff1e4', sub: '#e0b598', accent: '#ff6b35', accent2: '#ffc14d' },
+    boutiqueRose: { bg1: '#3d1c3a', bg2: '#160a16', ink: '#fff5f8', sub: '#e8c4d4', accent: '#f4a6c0', accent2: '#ffd7e4' },
+  };
+  return map[id ?? ''] ?? map.royalGold;
+}
+
+const DISPLAY = '"Playfair Display", Georgia, serif';
+const SANS = '"Poppins", "Segoe UI", sans-serif';
+const INDIC = '"Noto Sans Devanagari", "Noto Sans Telugu", "Noto Sans Tamil", "Nirmala UI", sans-serif';
+
+function loadImage(src: string, timeoutMs = 25_000): Promise<HTMLImageElement | null> {
+  return new Promise((res) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    // Hard timeout: a hanging image request (rate-limited endpoint, dead
+    // network) must degrade to a gradient scene, never stall the render.
+    const timer = setTimeout(() => { img.src = ''; res(null); }, timeoutMs);
+    img.onload = () => { clearTimeout(timer); res(img); };
+    img.onerror = () => { clearTimeout(timer); res(null); };
+    img.src = src;
+  });
+}
+
+/**
+ * Fetch an AI scene image from our own /api/scene-image route — Gemini when
+ * the owner added a key, a free fallback provider otherwise. The route
+ * answers with a data:image/...;base64 dataURL, so no third-party image
+ * host is ever hit from the browser. Returns null on ANY failure (bad
+ * input, all providers down, network error, 35s timeout) — callers fall
+ * back to a gradient scene; this never throws.
+ */
+export async function fetchSceneImage(
+  prompt: string,
+  aspect: '9:16' | '1:1' | '16:9' = '9:16'
+): Promise<string | null> {
+  const attempt = async (): Promise<string | null> => {
+    const r = await authFetch('/api/scene-image', { prompt, aspect });
+    if (!r.ok) return null; // 400/503 — gradient scene, never throw
+    const { imageDataUrl } = await r.json();
+    return typeof imageDataUrl === 'string' && imageDataUrl.startsWith('data:image')
+      ? imageDataUrl
+      : null;
+  };
+  // 35s hard ceiling over the whole operation (fetch + body parse): a hung
+  // route must degrade to a gradient scene, never stall the render.
+  const timeout = new Promise<null>((res) => setTimeout(() => res(null), 35_000));
+  try {
+    return await Promise.race([attempt(), timeout]);
+  } catch {
+    return null;
+  }
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) {
+      lines.push(line);
+      line = w;
+      if (lines.length === maxLines) break;
+    } else line = t;
+  }
+  if (lines.length < maxLines && line) lines.push(line);
+  return lines;
+}
+
+function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, alpha: number, zoom: number, dy: number) {
+  const s = Math.max(W / img.width, H / img.height) * zoom;
+  const dw = img.width * s;
+  const dh = img.height * s;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2 + dy, dw, dh);
+  ctx.restore();
+}
+
+function drawSceneText(
+  ctx: CanvasRenderingContext2D,
+  p: ReturnType<typeof paletteOf>,
+  title: string,
+  subtitle: string | undefined,
+  progress: number
+) {
+  // bottom scrim so text always reads over any image
+  const scrim = ctx.createLinearGradient(0, H * 0.55, 0, H);
+  scrim.addColorStop(0, 'rgba(0,0,0,0)');
+  scrim.addColorStop(1, 'rgba(0,0,0,0.78)');
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, H * 0.55, W, H * 0.45);
+
+  const slide = (1 - progress) * 80; // text slides up and fades in
+  const alpha = Math.min(1, progress * 2.2);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // accent tick
+  ctx.fillStyle = p.accent;
+  ctx.fillRect(90, H - 560 + slide, 120, 10);
+
+  let size = 92;
+  ctx.font = `900 ${size}px ${DISPLAY}`;
+  while (ctx.measureText(title).width > W - 180 && size > 44) {
+    size -= 4;
+    ctx.font = `900 ${size}px ${DISPLAY}`;
+  }
+  const titleLines = wrap(ctx, title, W - 180, 3);
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'top';
+  titleLines.forEach((l, i) => ctx.fillText(l, 90, H - 520 + slide + i * (size * 1.12)));
+
+  if (subtitle) {
+    const subY = H - 520 + slide + titleLines.length * (size * 1.12) + 26;
+    ctx.font = `600 44px ${INDIC}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    wrap(ctx, subtitle, W - 200, 2).forEach((l, i) => ctx.fillText(l, 90, subY + i * 60));
+  }
+  ctx.restore();
+}
+
+interface VoiceAudio {
+  ctx: AudioContext;
+  buffer: AudioBuffer;
+  dest: MediaStreamAudioDestinationNode;
+}
+
+/**
+ * Fetch the AI voiceover from /api/tts and decode it ahead of recording.
+ * Returns null on ANY failure (network error, non-ok response, decode
+ * error) — the renderer then proceeds silent; voice must never fail the
+ * whole render.
+ */
+async function prepareVoiceAudio(vo: VoiceoverSpec): Promise<VoiceAudio | null> {
+  try {
+    const res = await authFetch(
+      '/api/tts',
+      { text: vo.text, language: vo.language, voice: vo.voice },
+      { method: 'POST' }
+    );
+    if (!res.ok) return null; // route errors are short + human; we just go silent
+    const bytes = await res.arrayBuffer();
+    const ctx = new AudioContext();
+    const buffer = await ctx.decodeAudioData(bytes);
+    const dest = ctx.createMediaStreamDestination();
+    // autoplay policy can leave the context suspended (which would record
+    // silence) — nudge it awake, best effort
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+    return { ctx, buffer, dest };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Render the promo video and return a blob URL the caller can play and
+ * download. `onProgress` gets 0..1 for a progress bar.
+ */
+export async function renderPromoVideo(
+  spec: VideoSpec,
+  onProgress?: (fraction: number) => void
+): Promise<RenderResult> {
+  // 1. preload every scene image (nulls are fine — gradient scenes).
+  //    The owner's own photo (photos[i], a dataURL) wins — zero network.
+  //    Any other scene with an imagePrompt fetches an AI still from our own
+  //    /api/scene-image route as a dataURL. Every scene resolves
+  //    independently and is caught to null, so one bad scene (slow route,
+  //    failed fetch) never stalls or fails the whole render.
+  const images = await Promise.all(
+    spec.scenes.map(async (s, i) => {
+      try {
+        const photo = spec.photos?.[i];
+        if (photo?.startsWith('data:image')) return await loadImage(photo);
+        if (s.imagePrompt) {
+          const dl = await fetchSceneImage(s.imagePrompt);
+          if (dl) return await loadImage(dl); // dataURL — loads instantly
+        }
+        return null; // → animated gradient scene
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  // 2. voiceover audio — fetched and decoded BEFORE the recorder starts, so
+  //    its duration can pace the scenes and its track can join the stream.
+  const voice =
+    spec.voiceover && spec.voiceover.text.trim() ? await prepareVoiceAudio(spec.voiceover) : null;
+
+  // 3. recorder setup
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is not available in this browser.');
+
+  const canvasStream = canvas.captureStream(30);
+  // mix the decoded narration into the recorded stream when available
+  const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
+  if (voice) tracks.push(...voice.dest.stream.getAudioTracks());
+  const stream = new MediaStream(tracks);
+  // with audio present, ask for an audio codec (opus) explicitly
+  // MP4 (h264+AAC) first: plays in every browser and webview (some builds
+  // can record WebM+opus but not play it back), and uploads cleanly to
+  // Instagram/WhatsApp. WebM variants remain as fallbacks.
+  const mimeCandidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm',
+  ];
+  const mime = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
+  if (!mime) throw new Error('This browser cannot record video (WebM unsupported). Try Chrome or Edge.');
+  const chunks: Blob[] = [];
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+
+  const p = paletteOf(spec.paletteId);
+  const totalScenes = spec.scenes.length + 1; // + CTA card
+  let sps = spec.secondsPerScene ?? 2.6;
+  if (voice) {
+    // pace the scenes to the narration so the video roughly matches it —
+    // floor 2.2s per scene, total capped at 30s
+    sps = Math.max(2.2, voice.buffer.duration / totalScenes);
+    if (sps * totalScenes > 30) sps = 30 / totalScenes;
+  }
+  const totalMs = totalScenes * sps * 1000;
+
+  const bgFill = (t: number) => {
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    const k = 0.5 + 0.5 * Math.sin(t * 0.7);
+    g.addColorStop(0, p.bg1);
+    g.addColorStop(1, p.bg2);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // soft moving glow keeps gradient scenes alive
+    const glow = ctx.createRadialGradient(W * (0.3 + 0.4 * k), H * 0.3, 40, W * 0.5, H * 0.45, H * 0.6);
+    glow.addColorStop(0, `${p.accent}26`);
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+    void t;
+  };
+
+  // 4. animate + record
+  const done = new Promise<Blob>((resolve, reject) => {
+    rec.onstop = () => resolve(new Blob(chunks, { type: mime }));
+    rec.onerror = () => reject(new Error('Recording failed — please try again.'));
+    if (voice) {
+      try {
+        // narration starts at the same moment recording starts
+        const src = voice.ctx.createBufferSource();
+        src.buffer = voice.buffer;
+        src.connect(voice.dest); // → the recorded audio track
+        // also let the owner hear it live while rendering
+        const monitor = voice.ctx.createGain();
+        monitor.gain.value = 0.9;
+        src.connect(monitor);
+        monitor.connect(voice.ctx.destination);
+        src.start();
+      } catch {
+        // voice setup failed — continue silent rather than fail the render
+      }
+    }
+    rec.start(250);
+
+    const start = performance.now();
+    const frame = () => {
+      const t = performance.now() - start;
+      onProgress?.(Math.min(1, t / totalMs));
+      const idx = Math.min(Math.floor(t / (sps * 1000)), totalScenes - 1);
+      const local = (t - idx * sps * 1000) / (sps * 1000); // 0..1 within scene
+
+      bgFill(t / 1000);
+
+      if (idx < spec.scenes.length) {
+        const img = images[idx];
+        if (img) {
+          // Ken-Burns: slow zoom in, slight drift
+          const zoom = 1.05 + 0.12 * local;
+          const dy = -30 * local;
+          drawCover(ctx, img, 1, zoom, dy);
+        } else {
+          // gradient scene: big centered scene number motif
+          ctx.save();
+          ctx.globalAlpha = 0.12;
+          ctx.fillStyle = p.accent;
+          ctx.beginPath();
+          ctx.arc(W / 2, H * 0.42, 300 + 60 * Math.sin(t / 600), 0, 7);
+          ctx.fill();
+          ctx.restore();
+        }
+        drawSceneText(ctx, p, spec.scenes[idx].title, spec.scenes[idx].subtitle, local);
+      } else {
+        // ── final CTA card ──
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, local * 2);
+        let size = 120;
+        ctx.font = `900 ${size}px ${DISPLAY}`;
+        const cta = spec.cta.toUpperCase();
+        while (ctx.measureText(cta).width > W - 220 && size > 50) {
+          size -= 6;
+          ctx.font = `900 ${size}px ${DISPLAY}`;
+        }
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(cta, W / 2, H * 0.42);
+        ctx.font = `600 52px ${SANS}`;
+        ctx.fillStyle = p.accent;
+        ctx.fillText(spec.businessName.toUpperCase(), W / 2, H * 0.42 + size + 60);
+        ctx.font = `400 34px ${SANS}`;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillText('made with GrowMitra', W / 2, H * 0.42 + size + 140);
+        ctx.restore();
+      }
+
+      if (t < totalMs) {
+        requestAnimationFrame(frame);
+      } else {
+        // hold the last frame briefly, then stop
+        setTimeout(() => rec.stop(), 300);
+      }
+    };
+    requestAnimationFrame(frame);
+  });
+
+  let blob: Blob;
+  try {
+    blob = await done;
+  } finally {
+    // release the AudioContext whether recording succeeded or not
+    if (voice) void voice.ctx.close().catch(() => {});
+  }
+  return {
+    url: URL.createObjectURL(blob),
+    mimeType: mime,
+    durationSec: Math.round(totalMs / 100) / 10,
+    width: W,
+    height: H,
+  };
+}
+
+export function downloadVideo(url: string, businessName: string, mimeType?: string) {
+  const ext = mimeType?.includes('mp4') ? 'mp4' : 'webm';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${businessName.replace(/\s+/g, '_')}_promo.${ext}`;
+  a.click();
+}

@@ -1,11 +1,6 @@
 export interface UserOrder {
   id: string;
-  planId: string;
-  planName: string;
-  price: number;
-  status: 'pending' | 'paid' | 'active' | 'completed';
-  razorpayOrderId?: string;
-  razorpayPaymentId?: string;
+  status: 'active' | 'completed';
   createdAt: number;
   // Business details
   businessName: string;
@@ -25,12 +20,8 @@ export interface UserOrder {
 export interface DayMetric {
   day: number;
   date: string;
-  projected: {
-    reach: number;
-    clicks: number;
-    impressions: number;
-    conversions: number;
-  };
+  // Only real numbers the owner entered in Update Metrics.
+  // GrowMitra tracks nothing automatically — no projections.
   actual?: {
     reach: number;
     clicks: number;
@@ -64,6 +55,13 @@ export interface FormData {
 export const CATEGORIES = [
   { value: 'Food & Beverage',          label: 'Food & Beverage',          emoji: '🍔' },
   { value: 'Fashion & Clothing',       label: 'Fashion & Clothing',       emoji: '👗' },
+  { value: 'Cloud Kitchen',            label: 'Cloud Kitchen',            emoji: '🍲' },
+  { value: 'Bakery / Home Baker',      label: 'Bakery / Home Baker',      emoji: '🧁' },
+  { value: 'Tiffin / Home Food',       label: 'Tiffin / Home Food',       emoji: '🍱' },
+  { value: 'Boutique / Tailoring',     label: 'Boutique / Tailoring',     emoji: '🧵' },
+  { value: 'Silk & Sarees',            label: 'Silk & Sarees',            emoji: '🥻' },
+  { value: 'Puja & Festive Items',     label: 'Puja & Festive Items',     emoji: '🪔' },
+  { value: 'Electronics & Mobile Shop', label: 'Electronics & Mobile Shop', emoji: '📱' },
   { value: 'Tech Startup',             label: 'Tech Startup',             emoji: '💻' },
   { value: 'Events & Hackathons',      label: 'Events & Hackathons',      emoji: '🎪' },
   { value: 'Real Estate',             label: 'Real Estate',              emoji: '🏠' },

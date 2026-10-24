@@ -2,17 +2,34 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, Mail, LogOut, Shield, ImageIcon, LayoutDashboard, Zap, Loader2, TrendingUp } from 'lucide-react';
+import {
+  Mail, LogOut, Shield, Zap, Loader2, TrendingUp, Sparkles, Calendar,
+  Video, Star, MessageCircle, Lightbulb, Sun, Moon, Wallet, Wallet2, Camera,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { PLANS } from '@/lib/plans';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { useTheme } from '../components/ThemeProvider';
+import { Card } from '../components/ui';
+
+const QUICK_ACTIONS = [
+  { icon: Camera, label: 'Post Studio', desc: 'Photo → festival poster', href: '/post-studio', color: 'var(--accent-soft)' },
+  { icon: Zap, label: 'New Campaign', desc: 'Voice or typed brief', href: '/campaign', color: 'var(--neon)' },
+  { icon: Calendar, label: 'Festival Calendar', desc: 'Browse Indian festivals for planning', href: '/festivals', color: 'var(--gold)' },
+  { icon: Video, label: 'Video Studio', desc: 'Reel scripts, shot by shot', href: '/video-studio', color: 'var(--accent-soft)' },
+  { icon: Star, label: 'Caption Scorer', desc: 'A/B test your hooks', href: '/scorer', color: 'var(--gold)' },
+  { icon: MessageCircle, label: 'Reply Agent', desc: 'Answer DMs in your language', href: '/reply-agent', color: 'var(--neon)' },
+  { icon: Lightbulb, label: 'Content Ideas', desc: 'Trending formats & hooks', href: '/content-studio', color: 'var(--gold)' },
+  { icon: Wallet2, label: 'Budget Strategy', desc: 'Creators vs boosted posts', href: '/strategy', color: 'var(--neon)' },
+];
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
-  const [userPlan, setUserPlan] = useState<string | null>(null);
+  const { theme, toggle } = useTheme();
+  const [businessName, setBusinessName] = useState('');
   const [postsUsed, setPostsUsed] = useState(0);
+  const [campaignCount, setCampaignCount] = useState<number | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
@@ -22,46 +39,29 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return;
     const load = async () => {
+      let orders: { createdAt?: number }[] = [];
+
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists() && snap.data().plan) {
-          setUserPlan(snap.data().plan || null);
-          setPostsUsed(snap.data().postsThisMonth || 0);
-          setDataLoading(false);
-          return;
+        if (snap.exists()) {
+          const d = snap.data();
+          if (d.businessName) setBusinessName(d.businessName);
+          setPostsUsed(d.postsThisMonth || 0);
         }
       } catch { /* fall through */ }
 
-      // Check orders collection directly
       try {
-        const { getDocs, collection, query, where } = await import('firebase/firestore');
-        const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          const orders: {planId: string}[] = [];
-          snap.forEach((d) => orders.push(d.data() as {planId: string}));
-          const rank: Record<string,number> = { pro: 3, growth: 2, starter: 1 };
-          const best = orders.reduce((a, b) => (rank[b.planId]||0) > (rank[a.planId]||0) ? b : a);
-          if (best.planId) { setUserPlan(best.planId); setDataLoading(false); return; }
-        }
+        const snap = await getDocs(query(collection(db, 'orders'), where('userId', '==', user.uid)));
+        snap.forEach((d) => orders.push(d.data() as { createdAt?: number }));
       } catch { /* fall through */ }
 
-      // localStorage fallback
-      const planData = localStorage.getItem(`user_plan_${user.uid}`);
-      if (planData) {
-        try { const p = JSON.parse(planData); setUserPlan(p.plan || null); setDataLoading(false); return; } catch { /* ignore */ }
+      if (!orders.length) {
+        // localStorage fallback
+        const keys = Object.keys(localStorage).filter((k) => k.startsWith('order_'));
+        orders = keys.map((k) => { try { return JSON.parse(localStorage.getItem(k) || '{}'); } catch { return {}; } });
       }
-      const keys = Object.keys(localStorage).filter((k) => k.startsWith('order_'));
-      if (keys.length > 0) {
-        const orders = keys.map((k) => { try { return JSON.parse(localStorage.getItem(k)||'{}'); } catch { return {}; }});
-        const userOrders = orders.filter((o) => o.userId === user.uid || !o.userId);
-        if (userOrders.length > 0) {
-          const rank: Record<string,number> = { pro: 3, growth: 2, starter: 1 };
-          const best = userOrders.reduce((a: {planId:string}, b: {planId:string}) =>
-            (rank[b.planId]||0) > (rank[a.planId]||0) ? b : a, { planId: 'none' });
-          setUserPlan(best.planId !== 'none' ? best.planId : null);
-        }
-      }
+
+      setCampaignCount(orders.length);
       setDataLoading(false);
     };
     load();
@@ -69,116 +69,131 @@ export default function ProfilePage() {
 
   if (loading || dataLoading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <Loader2 size={22} className="animate-spin text-violet-400" />
+      <Loader2 size={22} className="animate-spin text-[var(--accent-soft)]" />
     </div>
   );
 
   if (!user) return null;
 
-  const plan = PLANS.find((p) => p.id === userPlan);
-  const postLimit = userPlan === 'pro' ? Infinity : userPlan === 'growth' ? 15 : 0;
   const initials = user.displayName?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) || user.email?.[0].toUpperCase() || '?';
+  const memberSince = user.metadata?.creationTime
+    ? new Date(user.metadata.creationTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  const displayName = businessName || user.displayName || 'Shop Owner';
 
   return (
     <main className="min-h-screen relative overflow-hidden">
-      <div className="orb w-[500px] h-[500px] bg-violet-600/8 top-[-200px] right-[-100px]" />
-      <div className="relative z-10 max-w-2xl mx-auto px-6 py-14">
+      <div className="orb w-[500px] h-[500px] bg-[var(--accent)]/8 top-[-200px] right-[-100px]" />
+      <div className="relative z-10 max-w-3xl mx-auto px-6 py-14">
 
-        <h1 className="text-4xl font-light text-white mb-10 tracking-wide" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
-          My Profile
-        </h1>
-
-        {/* Avatar + name */}
-        <div className="bg-[#16161f] border border-white/[0.06] rounded-3xl p-8 mb-5 flex items-center gap-6">
-          {user.photoURL ? (
-            <img src={user.photoURL} alt="" className="w-16 h-16 rounded-2xl" referrerPolicy="no-referrer" />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-violet-600/20 border border-violet-500/25 flex items-center justify-center text-violet-300 text-xl font-light" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
-              {initials}
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-light text-white mb-1" style={{ fontFamily: 'Cormorant Garamond, serif' }}>
-              {user.displayName || 'User'}
-            </h2>
-            <div className="flex items-center gap-1.5 text-sm text-slate-500 font-light">
-              <Mail size={12} />{user.email}
+        {/* ── Identity card ── */}
+        <Card className="p-8 mb-5 animate-fade-up">
+          <div className="flex items-center gap-6 flex-wrap">
+            {user.photoURL ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.photoURL} alt="" className="w-16 h-16 rounded-2xl" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/25 flex items-center justify-center text-[var(--accent-soft)] text-xl font-display font-bold">
+                {initials}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-2xl font-bold text-[var(--text)] mb-0.5">{displayName}</h2>
+              <div className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
+                <Mail size={12} /><span className="truncate">{user.email}</span>
+              </div>
+              {memberSince && (
+                <div className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] mt-1">
+                  <Calendar size={10} /> Mitra since {memberSince}
+                </div>
+              )}
             </div>
             {user.providerData[0]?.providerId === 'google.com' && (
-              <span className="inline-flex items-center gap-1 text-xs text-slate-600 font-light mt-1.5">
-                <Shield size={10} /> Signed in with Google
+              <span className="inline-flex items-center gap-1 text-xs text-[var(--text-faint)]">
+                <Shield size={10} /> Google account
               </span>
             )}
           </div>
+        </Card>
+
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-3 gap-4 mb-5 animate-fade-up delay-1">
+          <Card className="p-5 text-center">
+            <TrendingUp size={16} className="text-[var(--success)] mx-auto mb-2" />
+            <div className="font-display text-2xl font-bold text-[var(--text)]">{campaignCount ?? '—'}</div>
+            <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">Campaigns</div>
+          </Card>
+          <Card className="p-5 text-center">
+            <Sparkles size={16} className="text-[var(--accent-soft)] mx-auto mb-2" />
+            <div className="font-display text-2xl font-bold text-[var(--text)]">{postsUsed}</div>
+            <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">Posts created</div>
+          </Card>
+          <Card className="p-5 text-center">
+            <Zap size={16} className="text-[var(--gold)] mx-auto mb-2" />
+            <div className="font-display text-2xl font-bold text-[var(--text)]">∞</div>
+            <div className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">Generations left</div>
+          </Card>
         </div>
 
-        {/* Plan */}
-        <div className="bg-[#16161f] border border-white/[0.06] rounded-3xl p-6 mb-5">
-          <div className="text-xs font-light text-slate-500 uppercase tracking-widest mb-4">Current Plan</div>
-          {plan ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: plan.accentColor }}>
-                  <TrendingUp size={16} style={{ color: plan.color }} />
-                </div>
-                <div>
-                  <div className="text-base font-light text-white" style={{ fontFamily: 'Cormorant Garamond, serif' }}>{plan.name} Plan</div>
-                  <div className="text-xs text-slate-500 font-light">{plan.duration}-day campaigns · {plan.platforms.length} platforms</div>
-                </div>
+        {/* ── Access ── */}
+        <Card className="p-6 mb-5 animate-fade-up delay-2">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]">
+                <Zap size={16} className="text-[var(--accent-soft)]" />
               </div>
-              <div className="text-right">
-                <div className="text-lg font-light" style={{ fontFamily: 'Cormorant Garamond, serif', color: plan.color }}>
-                  ₹{plan.price.toLocaleString('en-IN')}
-                </div>
-                <div className="text-xs text-slate-600 font-light">one-time</div>
+              <div>
+                <div className="text-base font-semibold text-[var(--text)]">Everything unlocked</div>
+                <div className="text-xs text-[var(--text-muted)]">All tools · every platform · unlimited AI generations</div>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-light text-sm">No active plan</span>
-              <button onClick={() => router.push('/')}
-                className="text-xs font-light text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1">
-                <Zap size={10} />Browse plans
+            <div className="text-right">
+              <div className="font-display text-lg font-bold text-[var(--accent-soft)]">All access</div>
+              <div className="text-xs text-[var(--text-faint)]">everything unlocked</div>
+            </div>
+          </div>
+        </Card>
+
+        {/* ── All tools ── */}
+        <div className="mb-5 animate-fade-up delay-3">
+          <div className="text-xs text-[var(--text-muted)] uppercase tracking-widest mb-3 px-1">Everything in your mitra</div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {QUICK_ACTIONS.map(({ icon: Icon, label, desc, href, color }) => (
+              <button key={href} onClick={() => router.push(href)}
+                className="flex items-center gap-3.5 p-4 rounded-2xl bg-[var(--card)] border border-[var(--border)] text-left hover:border-[var(--accent)]/40 hover:-translate-y-0.5 transition-all">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)` }}>
+                  <Icon size={15} style={{ color }} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm text-[var(--text)]">{label}</div>
+                  <div className="text-xs text-[var(--text-faint)] truncate">{desc}</div>
+                </div>
               </button>
-            </div>
-          )}
-        </div>
-
-        {/* Post Studio usage */}
-        {(userPlan === 'growth' || userPlan === 'pro') && (
-          <div className="bg-[#16161f] border border-white/[0.06] rounded-3xl p-6 mb-5">
-            <div className="text-xs font-light text-slate-500 uppercase tracking-widest mb-4">Post Studio — This Month</div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-light text-slate-400">Posts generated</span>
-              <span className="text-sm font-light text-white">
-                {postsUsed} / {postLimit === Infinity ? '∞' : postLimit}
-              </span>
-            </div>
-            {postLimit !== Infinity && (
-              <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${Math.min((postsUsed / (postLimit as number)) * 100, 100)}%`, background: postsUsed >= (postLimit as number) ? '#ef4444' : '#10b981' }} />
-              </div>
-            )}
+            ))}
           </div>
-        )}
-
-        {/* Quick links */}
-        <div className="bg-[#16161f] border border-white/[0.06] rounded-3xl p-4 mb-5 space-y-1">
-          {[
-            { icon: LayoutDashboard, label: 'My Campaigns', href: '/my-campaigns' },
-            { icon: ImageIcon, label: 'Post Studio', href: '/post-studio' },
-          ].map(({ icon: Icon, label, href }) => (
-            <button key={href} onClick={() => router.push(href)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-light text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all text-left">
-              <Icon size={14} />{label}
-            </button>
-          ))}
         </div>
 
-        {/* Sign out */}
+        {/* ── Appearance ── */}
+        <Card className="p-5 mb-5 animate-fade-up delay-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {theme === 'dark' ? <Moon size={15} className="text-[var(--accent-soft)]" /> : <Sun size={15} className="text-[var(--gold)]" />}
+              <div>
+                <div className="text-sm text-[var(--text)]">Appearance</div>
+                <div className="text-xs text-[var(--text-faint)]">{theme === 'dark' ? 'Dark mode' : 'Light mode'} — both look great here</div>
+              </div>
+            </div>
+            <button onClick={toggle} role="switch" aria-checked={theme === 'dark'} aria-label="Toggle dark mode"
+              className="relative w-12 rounded-full border border-[var(--border)] bg-[var(--bg-alt)] transition-colors" style={{ height: 26 }}>
+              <span className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[var(--accent)] shadow transition-all"
+                style={{ left: theme === 'dark' ? 3 : 25 }} />
+            </button>
+          </div>
+        </Card>
+
+        {/* ── Sign out ── */}
         <button onClick={async () => { await logout(); router.push('/'); }}
-          className="w-full py-3.5 rounded-2xl text-sm font-light text-red-400 border border-red-500/15 hover:bg-red-500/6 transition-all flex items-center justify-center gap-2">
+          className="w-full py-3.5 rounded-full text-sm text-[var(--danger)] border border-[var(--danger)]/20 hover:bg-[var(--danger)]/8 transition-all flex items-center justify-center gap-2 animate-fade-up delay-5">
           <LogOut size={13} />Sign Out
         </button>
       </div>

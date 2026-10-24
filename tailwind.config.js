@@ -1,25 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./pages/**/*.{js,ts,jsx,tsx,mdx}','./components/**/*.{js,ts,jsx,tsx,mdx}','./app/**/*.{js,ts,jsx,tsx,mdx}'],
+  content: ['./pages/**/*.{js,ts,jsx,tsx,mdx}','./components/**/*.{js,ts,jsx,tsx,mdx}','./app/**/*.{js,ts,jsx,tsx,mdx}','./lib/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        display: ['Cormorant Garamond', 'Georgia', 'serif'],
-        body: ['Outfit', 'sans-serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        body: ['Poppins', 'sans-serif'],
       },
       colors: {
-        ink: '#08080d',
-        surface: '#0e0e16',
-        card: '#16161f',
-        border: '#1e1e2e',
-        accent: '#7c3aed',
-        'accent-light': '#a78bfa',
-        neon: '#22d3ee',
-        gold: '#f59e0b',
-        text: '#e2e8f0',
-        muted: '#64748b',
-        success: '#10b981',
-        danger: '#ef4444',
+        ink: 'var(--bg)',
+        surface: 'var(--bg-alt)',
+        card: 'var(--card)',
+        border: 'var(--border)',
+        accent: 'var(--accent)',
+        'accent-light': 'var(--accent-soft)',
+        neon: 'var(--neon)',
+        gold: 'var(--gold)',
+        text: 'var(--text)',
+        soft: 'var(--text-soft)',
+        muted: 'var(--text-muted)',
+        success: 'var(--success)',
+        danger: 'var(--danger)',
       },
       animation: {
         'slide-up': 'slideUp 0.35s ease-out',

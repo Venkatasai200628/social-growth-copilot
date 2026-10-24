@@ -1,14 +1,16 @@
-"use client";
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { FormData, CATEGORIES } from "@/lib/types";
-import { ArrowLeft, ChevronRight, Copy, Check, Zap, TrendingUp, Hash, Clock, AlertTriangle, RefreshCw, Sparkles } from "lucide-react";
+'use client';
 
-interface ReelFormat { format: string; description: string; example: string; difficulty: string; virality: number; }
-interface Hook { hook: string; type: string; platform: string; }
-interface ContentAngle { angle: string; description: string; example: string; }
-interface HashtagSet { set_name: string; tags: string[]; }
-interface PostingTime { platform: string; times: string[]; reason: string; }
+import { useState } from 'react';
+import { Lightbulb, Zap, TrendingUp, Hash, Clock, AlertTriangle, RefreshCw, Copy, Check } from 'lucide-react';
+import { PageHeader, Card, Field, inputCls, Button, Skeleton, Tabs, EmptyState } from '../components/ui';
+import { CATEGORIES } from '@/lib/types';
+import { authFetch } from '@/lib/client';
+
+interface ReelFormat { format: string; description: string; example: string; difficulty: string; virality: number }
+interface Hook { hook: string; type: string; platform: string }
+interface ContentAngle { angle: string; description: string; example: string }
+interface HashtagSet { set_name: string; tags: string[] }
+interface PostingTime { platform: string; times: string[]; reason: string }
 interface StudioData {
   reel_formats: ReelFormat[];
   hooks: Hook[];
@@ -18,243 +20,204 @@ interface StudioData {
   content_dont: string[];
 }
 
-const DIFF_COLOR: Record<string, string> = { Easy: "#10b981", Medium: "#f97316", Hard: "#ef4444" };
-const HOOK_COLORS: Record<string, string> = { Curiosity: "#6c47ff", Shock: "#ef4444", Relatability: "#10b981", FOMO: "#f97316", Humor: "#0ea5e9" };
-
-function CopyBtn({ text, small }: { text: string; small?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      style={{ display:"flex", alignItems:"center", gap:4, padding: small ? "3px 8px" : "5px 10px", borderRadius:6, border:"1px solid var(--border)", background:"white", fontSize:11, color:"var(--text-secondary)", cursor:"pointer" }}>
-      {copied ? <Check size={10} color="#10b981"/> : <Copy size={10}/>}
-      {copied ? "Copied" : "Copy"}
-    </button>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:20 }}>
-      <div style={{ width:60, height:60, borderRadius:"50%", border:"3px solid var(--brand-light)", borderTop:"3px solid var(--brand)", animation:"spin 1s linear infinite" }}/>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      <h2 style={{ fontFamily:"var(--font-display)", margin:0 }}>Analysing trending content...</h2>
-      <p style={{ color:"var(--text-secondary)", margin:0, fontSize:14 }}>Finding what works for your niche right now</p>
-    </div>
-  );
-}
+const DIFF_COLOR: Record<string, string> = { Easy: 'var(--success)', Medium: 'var(--gold)', Hard: 'var(--danger)' };
 
 export default function ContentStudioPage() {
-  const router = useRouter();
-  const [form, setForm] = useState<FormData | null>(null);
+  const [category, setCategory] = useState(CATEGORIES[7].value);
+  const [goal, setGoal] = useState('Drive Sales / Conversions');
+  const [language, setLanguage] = useState('english');
+  const [platform, setPlatform] = useState('Instagram');
   const [data, setData] = useState<StudioData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"formats"|"hooks"|"angles"|"hashtags"|"timing"|"donts">("formats");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [tab, setTab] = useState('formats');
+  const [copiedIdx, setCopiedIdx] = useState<string | null>(null);
 
-  const generate = useCallback(async (f: FormData) => {
-    setLoading(true); setError("");
+  const generate = async () => {
+    setLoading(true); setError(''); setData(null);
     try {
-      const res = await fetch("/api/content-studio", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(f) });
+      const res = await authFetch('/api/content-studio', { category, goal, platforms: [platform], language });
       const json = await res.json();
-      if (json.success) { setData(json.data); sessionStorage.setItem("sgc_studio", JSON.stringify(json.data)); }
-      else setError(json.error);
-    } catch { setError("Network error"); }
-    finally { setLoading(false); }
-  }, []);
+      if (json.success) setData(json.data);
+      else throw new Error(json.error || 'Could not generate ideas.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong — please try again in a moment.');
+    } finally { setLoading(false); }
+  };
 
-  useEffect(() => {
-    const raw = sessionStorage.getItem("sgc_form");
-    if (!raw) { router.push("/"); return; }
-    const f = JSON.parse(raw) as FormData;
-    setForm(f);
-    const cached = sessionStorage.getItem("sgc_studio");
-    if (cached) { setData(JSON.parse(cached)); setLoading(false); }
-    else generate(f);
-  }, [router, generate]);
-
-  if (loading) return <LoadingState />;
-  if (error) return <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:12 }}><p style={{ color:"#ef4444" }}>{error}</p><button onClick={() => form && generate(form)} style={{ padding:"9px 18px", borderRadius:8, background:"var(--brand)", color:"white", border:"none", cursor:"pointer" }}>Retry</button></div>;
-  if (!data || !form) return null;
-
-  const cat = CATEGORIES.find(c => c.value === form.category);
-
-  const TABS = [
-    { key:"formats", label:"Reel formats", icon:<Zap size={13}/> },
-    { key:"hooks",   label:"Hooks",        icon:<Sparkles size={13}/> },
-    { key:"angles",  label:"Content angles", icon:<TrendingUp size={13}/> },
-    { key:"hashtags",label:"Hashtags",     icon:<Hash size={13}/> },
-    { key:"timing",  label:"Best times",   icon:<Clock size={13}/> },
-    { key:"donts",   label:"Avoid these",  icon:<AlertTriangle size={13}/> },
-  ] as const;
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(key);
+    setTimeout(() => setCopiedIdx(null), 1600);
+  };
 
   return (
-    <div style={{ minHeight:"100vh", background:"var(--surface)" }}>
-      <div style={{ maxWidth:860, margin:"0 auto", padding:"2rem 1.5rem 5rem" }}>
+    <main className="min-h-screen relative overflow-hidden">
+      <div className="orb w-[500px] h-[500px] bg-[color-mix(in_srgb,var(--neon)_8%,transparent)] top-[-150px] right-[-100px]" />
+      <div className="relative z-10 max-w-5xl mx-auto px-6 py-14">
+        <PageHeader
+          eyebrow={<><Lightbulb size={11} /> Content Ideas</>}
+          title="What should you post this week?"
+          sub="Trending formats, hooks and hashtag sets for your niche — with copy-ready examples in your language."
+        />
 
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28 }}>
-          <button onClick={() => router.push("/campaign")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--text-secondary)", fontSize:14, padding:0 }}>
-            <ArrowLeft size={16}/> Back
-          </button>
-          <button onClick={() => { sessionStorage.removeItem("sgc_studio"); form && generate(form); }}
-            style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 12px", borderRadius:8, border:"1px solid var(--border)", background:"white", fontSize:12, color:"var(--text-secondary)", cursor:"pointer" }}>
-            <RefreshCw size={12}/> Refresh ideas
-          </button>
-        </div>
-
-        {/* Header */}
-        <div className="animate-fade-up" style={{ marginBottom:24 }}>
-          <p style={{ margin:"0 0 6px", fontSize:13, color:"var(--text-muted)", fontWeight:500 }}>STEP 4 OF 6 — CONTENT STUDIO</p>
-          <h1 style={{ fontFamily:"var(--font-display)", fontWeight:800, fontSize:"clamp(1.5rem,4vw,2.2rem)", margin:"0 0 8px" }}>
-            Trending ideas for {cat?.label} {cat?.emoji}
-          </h1>
-          <p style={{ fontSize:14, color:"var(--text-secondary)", margin:0 }}>
-            Content formats, hooks, and strategies that are performing right now in your category.
-          </p>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:4, marginBottom:20, scrollbarWidth:"none" }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0, padding:"8px 14px", borderRadius:10, border: activeTab===t.key ? "2px solid var(--brand)" : "1.5px solid var(--border)", background: activeTab===t.key ? "var(--brand-light)" : "white", cursor:"pointer", fontSize:13, fontWeight:500, color: activeTab===t.key ? "var(--brand)" : "var(--text-secondary)", transition:"all .12s" }}>
-              <span style={{ color: activeTab===t.key ? "var(--brand)" : "var(--text-muted)" }}>{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* REEL FORMATS */}
-        {activeTab === "formats" && (
-          <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {data.reel_formats?.map((f, i) => (
-              <div key={i} style={{ background:"white", borderRadius:14, border:"1px solid var(--border)", overflow:"hidden" }}>
-                <div style={{ padding:"14px 18px", borderBottom:"1px solid var(--border)", background:"var(--surface-2)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:32, height:32, borderRadius:8, background:"var(--brand-light)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-display)", fontWeight:800, fontSize:14, color:"var(--brand)" }}>{i+1}</div>
-                    <h3 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:700, fontSize:15 }}>{f.format}</h3>
-                  </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, background:`${DIFF_COLOR[f.difficulty]}20`, color:DIFF_COLOR[f.difficulty] }}>{f.difficulty}</span>
-                    <span style={{ fontSize:13, fontWeight:700, color: f.virality>=80?"#10b981":f.virality>=65?"#f97316":"#ef4444" }}>{f.virality}/100</span>
-                  </div>
-                </div>
-                <div style={{ padding:"14px 18px", display:"flex", flexDirection:"column", gap:8 }}>
-                  <p style={{ margin:0, fontSize:13, color:"var(--text-secondary)", lineHeight:1.6 }}>{f.description}</p>
-                  <div style={{ padding:"10px 14px", borderRadius:8, background:"#ede9ff", border:"1px solid #c4b5fd" }}>
-                    <p style={{ margin:0, fontSize:13, color:"#4c1d95", fontWeight:500 }}>Example: {f.example}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+        <Card className="p-7 mb-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Field label="Category">
+              <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
+                {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Goal">
+              <select className={inputCls} value={goal} onChange={(e) => setGoal(e.target.value)} aria-label="Goal">
+                {['Drive Sales / Conversions', 'Brand Awareness', 'Grow Followers', 'Generate Leads'].map((g) => <option key={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Platform">
+              <select className={inputCls} value={platform} onChange={(e) => setPlatform(e.target.value)} aria-label="Platform">
+                {['Instagram', 'Facebook', 'WhatsApp', 'YouTube'].map((p) => <option key={p}>{p}</option>)}
+              </select>
+            </Field>
           </div>
+          <Button onClick={generate} disabled={loading} className="mt-5" size="lg">
+            {loading ? 'Finding what works…' : <><Zap size={15} />Get Content Ideas</>}
+          </Button>
+          {error && (
+            <div className="mt-5 flex items-start gap-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-xl px-4 py-3 text-[var(--danger)] text-xs">
+              <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />{error}
+            </div>
+          )}
+        </Card>
+
+        {loading && (
+          <Card className="p-7 space-y-4">
+            <Skeleton className="h-6 w-1/4" />
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+          </Card>
         )}
 
-        {/* HOOKS */}
-        {activeTab === "hooks" && (
-          <div className="animate-fade-in" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:12 }}>
-            {data.hooks?.map((h, i) => (
-              <div key={i} style={{ background:"white", borderRadius:12, border:"1px solid var(--border)", padding:"14px 16px" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                  <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, background:`${HOOK_COLORS[h.type]||"#6c47ff"}18`, color:HOOK_COLORS[h.type]||"#6c47ff" }}>{h.type}</span>
-                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                    <span style={{ fontSize:11, color:"var(--text-muted)" }}>{h.platform}</span>
-                    <CopyBtn text={h.hook} small />
+        {!data && !loading && (
+          <EmptyState
+            icon={<Lightbulb size={22} />}
+            title="Ideas for your niche appear here"
+            sub="Trending reel formats, scroll-stopping hooks, content angles, hashtag sets and the best times to post — all copy-ready."
+            action={<Button onClick={generate}><Zap size={15} />Get Content Ideas</Button>}
+          />
+        )}
+
+        {data && !loading && (
+          <div className="animate-slide-up space-y-5">
+            <Tabs
+              tabs={[
+                { id: 'formats', label: 'Reel Formats' },
+                { id: 'hooks', label: 'Hooks' },
+                { id: 'angles', label: 'Content Angles' },
+                { id: 'hashtags', label: 'Hashtag Sets' },
+                { id: 'timing', label: 'Best Times' },
+                { id: 'donts', label: 'Don&apos;ts' },
+              ]}
+              active={tab}
+              onChange={setTab}
+            />
+
+            {tab === 'formats' && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {(data.reel_formats || []).map((f, i) => (
+                  <Card key={i} className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-[var(--text)]">{f.format}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)]" style={{ color: DIFF_COLOR[f.difficulty] || 'var(--text-muted)' }}>{f.difficulty}</span>
+                        <span className="text-xs text-[var(--gold)] flex items-center gap-1"><TrendingUp size={11} />{f.virality}/10</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-3">{f.description}</p>
+                    <div className="bg-[var(--bg-alt)] border border-[var(--border)] rounded-xl p-3 flex items-start justify-between gap-3">
+                      <p className="text-xs text-[var(--text-soft)] italic">&ldquo;{f.example}&rdquo;</p>
+                      <button onClick={() => copy(f.example, `f${i}`)} aria-label="Copy example" className="text-[var(--text-faint)] hover:text-[var(--text)] flex-shrink-0">
+                        {copiedIdx === `f${i}` ? <Check size={12} className="text-[var(--success)]" /> : <Copy size={12} />}
+                      </button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {tab === 'hooks' && (
+              <div className="space-y-3">
+                {(data.hooks || []).map((h, i) => (
+                  <Card key={i} className="p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-[var(--text)]">&ldquo;{h.hook}&rdquo;</p>
+                      <p className="text-xs text-[var(--text-faint)] mt-1">{h.type} · {h.platform}</p>
+                    </div>
+                    <button onClick={() => copy(h.hook, `h${i}`)} aria-label="Copy hook" className="text-[var(--text-faint)] hover:text-[var(--text)] flex-shrink-0">
+                      {copiedIdx === `h${i}` ? <Check size={14} className="text-[var(--success)]" /> : <Copy size={14} />}
+                    </button>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {tab === 'angles' && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {(data.content_angles || []).map((a, i) => (
+                  <Card key={i} className="p-5">
+                    <p className="text-sm font-medium text-[var(--text)] mb-1.5">{a.angle}</p>
+                    <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-3">{a.description}</p>
+                    <p className="text-xs text-[var(--text-soft)] italic bg-[var(--bg-alt)] border border-[var(--border)] rounded-xl p-3">{a.example}</p>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {tab === 'hashtags' && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {(data.hashtag_sets || []).map((s, i) => (
+                  <Card key={i} className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] flex items-center gap-1.5"><Hash size={11} />{s.set_name}</p>
+                      <button onClick={() => copy(s.tags.join(' '), `s${i}`)} aria-label="Copy hashtag set" className="text-xs text-[var(--accent-soft)] hover:underline flex items-center gap-1">
+                        {copiedIdx === `s${i}` ? <Check size={11} /> : <Copy size={11} />}Copy
+                      </button>
+                    </div>
+                    <p className="text-xs text-[var(--text-soft)] leading-relaxed">{s.tags.join(' ')}</p>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {tab === 'timing' && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {(data.best_posting_times || []).map((t, i) => (
+                  <Card key={i} className="p-5">
+                    <p className="text-sm font-medium text-[var(--text)] mb-2 flex items-center gap-2"><Clock size={13} className="text-[var(--accent-soft)]" />{t.platform}</p>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {t.times.map((time) => <span key={time} className="text-xs px-3 py-1 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent-soft)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)]">{time}</span>)}
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)]">{t.reason}</p>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {tab === 'donts' && (
+              <Card className="p-6 space-y-3">
+                {(data.content_dont || []).map((d, i) => (
+                  <div key={i} className="flex items-start gap-3 bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] border border-[color-mix(in_srgb,var(--danger)_15%,transparent)] rounded-xl p-4">
+                    <AlertTriangle size={13} className="text-[var(--danger)] mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-[var(--text-soft)]">{d}</p>
                   </div>
-                </div>
-                <p style={{ margin:0, fontSize:14, color:"var(--text-primary)", lineHeight:1.6, fontWeight:500 }}>
-                  &ldquo;{h.hook}&rdquo;
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+                ))}
+              </Card>
+            )}
 
-        {/* CONTENT ANGLES */}
-        {activeTab === "angles" && (
-          <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {data.content_angles?.map((a, i) => (
-              <div key={i} style={{ background:"white", borderRadius:12, border:"1px solid var(--border)", padding:"16px 20px" }}>
-                <h3 style={{ margin:"0 0 6px", fontFamily:"var(--font-display)", fontWeight:700, fontSize:15 }}>{a.angle}</h3>
-                <p style={{ margin:"0 0 10px", fontSize:13, color:"var(--text-secondary)", lineHeight:1.6 }}>{a.description}</p>
-                <div style={{ padding:"10px 14px", borderRadius:8, background:"#fff7ed", border:"1px solid #fed7aa" }}>
-                  <p style={{ margin:0, fontSize:13, color:"#92400e" }}>Try this: {a.example}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* HASHTAGS */}
-        {activeTab === "hashtags" && (
-          <div className="animate-fade-in" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:12 }}>
-            {data.hashtag_sets?.map((hs, i) => (
-              <div key={i} style={{ background:"white", borderRadius:12, border:"1px solid var(--border)", padding:"14px 16px" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                  <h3 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:700, fontSize:14 }}>{hs.set_name} hashtags</h3>
-                  <CopyBtn text={hs.tags.join(" ")} />
-                </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                  {hs.tags?.map((t, j) => (
-                    <span key={j} style={{ padding:"4px 10px", borderRadius:6, background:"#d1fae5", color:"#065f46", fontSize:12, fontWeight:500 }}>{t}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div style={{ background:"var(--brand-light)", borderRadius:12, border:"2px dashed #c4b5fd", padding:"14px 16px", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:8, cursor:"pointer" }}
-              onClick={() => { const all = data.hashtag_sets?.flatMap(s=>s.tags).join(" "); navigator.clipboard.writeText(all); }}>
-              <Copy size={18} color="var(--brand)"/>
-              <p style={{ margin:0, fontSize:13, fontWeight:600, color:"var(--brand)" }}>Copy all hashtags</p>
+            <div className="flex justify-center pt-2">
+              <Button variant="ghost" onClick={generate}><RefreshCw size={13} />Regenerate ideas</Button>
             </div>
           </div>
         )}
-
-        {/* TIMING */}
-        {activeTab === "timing" && (
-          <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {data.best_posting_times?.map((pt, i) => (
-              <div key={i} style={{ background:"white", borderRadius:12, border:"1px solid var(--border)", padding:"16px 20px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                  <Clock size={16} color="var(--brand)"/>
-                  <h3 style={{ margin:0, fontFamily:"var(--font-display)", fontWeight:700, fontSize:15 }}>{pt.platform}</h3>
-                </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:10 }}>
-                  {pt.times?.map((t, j) => (
-                    <span key={j} style={{ padding:"6px 14px", borderRadius:8, background:"var(--brand-light)", color:"var(--brand)", fontSize:14, fontWeight:700, fontFamily:"var(--font-display)" }}>{t}</span>
-                  ))}
-                </div>
-                <p style={{ margin:0, fontSize:13, color:"var(--text-secondary)", lineHeight:1.5 }}>{pt.reason}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* DON'TS */}
-        {activeTab === "donts" && (
-          <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            <div style={{ padding:"14px 18px", borderRadius:12, background:"#fef2f2", border:"1px solid #fecaca", marginBottom:4 }}>
-              <p style={{ margin:0, fontSize:14, color:"#991b1b", lineHeight:1.6 }}>
-                These are the most common mistakes brands in <strong>{cat?.label}</strong> make on social media. Avoid all of them.
-              </p>
-            </div>
-            {data.content_dont?.map((d, i) => (
-              <div key={i} style={{ background:"white", borderRadius:12, border:"1px solid var(--border)", padding:"14px 18px", display:"flex", alignItems:"flex-start", gap:12 }}>
-                <div style={{ width:24, height:24, borderRadius:"50%", background:"#fef2f2", border:"1px solid #fecaca", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:1 }}>
-                  <AlertTriangle size={12} color="#ef4444"/>
-                </div>
-                <p style={{ margin:0, fontSize:14, color:"var(--text-primary)", lineHeight:1.6 }}>{d}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div style={{ display:"flex", justifyContent:"flex-end", marginTop:28 }}>
-          <button onClick={() => router.push("/scorer")} style={{ display:"flex", alignItems:"center", gap:10, background:"var(--brand)", color:"white", border:"none", borderRadius:14, padding:"14px 28px", fontSize:15, fontWeight:600, cursor:"pointer", fontFamily:"var(--font-display)", boxShadow:"0 4px 16px rgba(108,71,255,0.35)" }}
-            onMouseOver={e=>(e.currentTarget.style.transform="translateY(-1px)")} onMouseOut={e=>(e.currentTarget.style.transform="translateY(0)")}>
-            Score my captions <ChevronRight size={18}/>
-          </button>
-        </div>
-
       </div>
-    </div>
+    </main>
   );
 }

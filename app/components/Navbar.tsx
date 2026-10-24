@@ -3,18 +3,20 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Zap, LayoutDashboard, Star, MessageCircle, TrendingUp,
-  Menu, X, LogOut, User, ImageIcon, ChevronDown, Film, Sun, Moon } from 'lucide-react';
+import { Zap, LayoutDashboard, Star, MessageCircle, Calendar, Home,
+  Menu, X, LogOut, User, ImageIcon, ChevronDown, Film, Sun, Moon, Leaf } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from './ThemeProvider';
 
-const navLinks = [
+const navLinks: { href: string; label: string; longLabel?: string; icon: typeof Zap }[] = [
+  { href: '/home', label: 'Home', longLabel: 'Home', icon: Home },
   { href: '/my-campaigns', label: 'My Campaigns', icon: LayoutDashboard },
   { href: '/post-studio', label: 'Post Studio', icon: ImageIcon },
-  { href: '/video-studio', label: 'Video Studio', icon: Film },
-  { href: '/campaign', label: 'Campaign Gen', icon: Zap },
-  { href: '/scorer', label: 'Virality Score', icon: Star },
-  { href: '/reply-agent', label: 'Auto-Reply', icon: MessageCircle },
+  { href: '/video-studio', label: 'Video', longLabel: 'Video Studio', icon: Film },
+  { href: '/campaign', label: 'Campaign', longLabel: 'Campaign Gen', icon: Zap },
+  { href: '/festivals', label: 'Festivals', longLabel: 'Festival calendar', icon: Calendar },
+  { href: '/scorer', label: 'Scorer', longLabel: 'Virality Scorer', icon: Star },
+  { href: '/reply-agent', label: 'Replies', longLabel: 'Reply Agent', icon: MessageCircle },
 ];
 
 export default function Navbar() {
@@ -51,34 +53,36 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
       style={{
-        background: scrolled ? 'rgba(8,8,13,0.95)' : 'rgba(8,8,13,0.6)',
+        background: scrolled ? 'color-mix(in srgb, var(--bg) 96%, transparent)' : 'color-mix(in srgb, var(--bg) 60%, transparent)',
         backdropFilter: 'blur(24px)',
-        borderBottom: scrolled ? '1px solid rgba(255,255,255,0.05)' : '1px solid transparent',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderBottom: scrolled ? '1px solid var(--border)' : '1px solid transparent',
       }}>
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-lg bg-violet-600/15 border border-violet-500/25 flex items-center justify-center">
-            <TrendingUp size={13} className="text-violet-400" />
+        <Link href="/" aria-label="GrowMitra home" className="flex items-center gap-2.5 group">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 p-[1.5px]">
+            <div className="w-full h-full rounded-[6px] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] flex items-center justify-center">
+              <Leaf size={13} className="text-emerald-400" />
+            </div>
           </div>
-          <span className="text-sm font-light text-white hidden sm:block tracking-widest uppercase"
-            style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '0.15em' }}>
-            Growth <span className="text-violet-400">Copilot</span>
+          <span className="text-sm font-light text-[var(--text)] hidden sm:block uppercase tracking-[0.15em]">
+            Grow<span className="text-[var(--accent-soft)]">Mitra</span>
           </span>
         </Link>
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-0.5">
-          {navLinks.map(({ href, label, icon: Icon }) => {
+          {navLinks.map(({ href, label, longLabel, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             return (
-              <Link key={href} href={href}
+              <Link key={href} href={href} aria-label={longLabel || label} aria-current={active ? 'page' : undefined}
                 className="flex items-center gap-1.5 text-xs font-light px-3 py-2 rounded-xl transition-all tracking-wide"
                 style={{
-                  background: active ? 'rgba(124,58,237,0.12)' : 'transparent',
-                  color: active ? '#a78bfa' : '#475569',
-                  border: active ? '1px solid rgba(124,58,237,0.2)' : '1px solid transparent',
+                  background: active ? 'var(--hover-fill)' : 'transparent',
+                  color: active ? 'var(--accent-soft)' : 'var(--text-muted)',
+                  border: active ? '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' : '1px solid transparent',
                 }}>
                 <Icon size={11} />{label}
               </Link>
@@ -88,46 +92,46 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <button onClick={toggleTheme}
-            className="w-8 h-8 rounded-xl border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06] flex items-center justify-center text-slate-500 hover:text-white transition-all">
+          <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="w-8 h-8 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] hover:bg-[var(--hover-fill)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition-all">
             {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
           </button>
 
           {user ? (
             <div className="relative" ref={menuRef}>
               <button onClick={() => setUserMenu(!userMenu)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-white/[0.06] hover:border-white/[0.12] bg-white/[0.03] hover:bg-white/[0.05] transition-all">
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--input-border)] hover:border-[var(--accent)]/30 bg-[var(--input-bg)] hover:bg-[var(--hover-fill)] transition-all">
                 {user.photoURL ? (
                   <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-violet-600/30 border border-violet-500/30 flex items-center justify-center text-violet-300 text-[10px] font-medium">
+                  <div className="w-6 h-6 rounded-full bg-[var(--accent)]/20 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent-soft)] text-[10px] font-medium">
                     {initials}
                   </div>
                 )}
-                <span className="text-xs text-slate-400 font-light hidden sm:block max-w-[100px] truncate">
+                <span className="text-xs text-[var(--text-soft)] font-light hidden sm:block max-w-[100px] truncate">
                   {user.displayName || user.email?.split('@')[0]}
                 </span>
-                <ChevronDown size={11} className="text-slate-600" />
+                <ChevronDown size={11} className="text-[var(--text-faint)]" />
               </button>
 
               {userMenu && (
-                <div className="absolute right-0 top-full mt-2 w-56 bg-[#16161f] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
-                  <div className="px-4 py-3 border-b border-white/[0.06]">
-                    <p className="text-xs font-light text-white truncate">{user.displayName || 'User'}</p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5 font-light">{user.email}</p>
+                <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+                  <div className="px-4 py-3 border-b border-[var(--border)]">
+                    <p className="text-xs font-light text-[var(--text)] truncate">{user.displayName || 'User'}</p>
+                    <p className="text-xs text-[var(--text-muted)] truncate mt-0.5 font-light">{user.email}</p>
                   </div>
                   <div className="p-1.5">
                     <button onClick={() => { router.push('/profile'); setUserMenu(false); }}
-                      className="w-full flex items-center gap-2.5 text-xs font-light text-slate-400 hover:text-white hover:bg-white/[0.05] px-3 py-2.5 rounded-xl transition-all text-left">
+                      className="w-full flex items-center gap-2.5 text-xs font-light text-[var(--text-soft)] hover:text-[var(--text)] hover:bg-[var(--hover-fill)] px-3 py-2.5 rounded-xl transition-all text-left">
                       <User size={12} /> My Profile
                     </button>
                     <button onClick={() => { router.push('/my-campaigns'); setUserMenu(false); }}
-                      className="w-full flex items-center gap-2.5 text-xs font-light text-slate-400 hover:text-white hover:bg-white/[0.05] px-3 py-2.5 rounded-xl transition-all text-left">
+                      className="w-full flex items-center gap-2.5 text-xs font-light text-[var(--text-soft)] hover:text-[var(--text)] hover:bg-[var(--hover-fill)] px-3 py-2.5 rounded-xl transition-all text-left">
                       <LayoutDashboard size={12} /> My Campaigns
                     </button>
-                    <div className="h-px bg-white/[0.05] my-1" />
+                    <div className="h-px bg-[var(--border)] my-1" />
                     <button onClick={async () => { await logout(); router.push('/'); setUserMenu(false); }}
-                      className="w-full flex items-center gap-2.5 text-xs font-light text-red-400 hover:text-red-300 hover:bg-red-500/8 px-3 py-2.5 rounded-xl transition-all text-left">
+                      className="w-full flex items-center gap-2.5 text-xs font-light text-[var(--danger)] hover:bg-[var(--danger)]/8 px-3 py-2.5 rounded-xl transition-all text-left">
                       <LogOut size={12} /> Sign Out
                     </button>
                   </div>
@@ -136,13 +140,13 @@ export default function Navbar() {
             </div>
           ) : (
             <Link href="/auth"
-              className="hidden md:flex items-center gap-1.5 text-xs font-light px-4 py-2 rounded-xl text-white transition-all hover:opacity-85 tracking-wide"
-              style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
+              className="hidden md:flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-full text-[var(--accent-contrast)] shadow-lg shadow-[var(--accent)]/25 transition-all hover:-translate-y-0.5 tracking-wide [background:linear-gradient(135deg,var(--accent),var(--accent-soft))]">
               <Zap size={11} /> Get Started
             </Link>
           )}
 
-          <button className="md:hidden text-slate-500 hover:text-white transition-colors" onClick={() => setOpen(!open)}>
+          <button className="md:hidden text-[var(--text-muted)] hover:text-[var(--text)] transition-colors" onClick={() => setOpen(!open)}
+            aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} aria-controls="mobile-nav-menu">
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
@@ -150,20 +154,21 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden border-t border-white/[0.05] bg-[#08080d]/98 px-6 py-4 space-y-1">
-          {navLinks.map(({ href, label, icon: Icon }) => {
+        <div id="mobile-nav-menu" className="md:hidden border-t border-[var(--border)] bg-[var(--bg)] px-6 py-4 space-y-1">
+          {navLinks.map(({ href, label, longLabel, icon: Icon }) => {
             const active = pathname === href;
             return (
-              <Link key={href} href={href} onClick={() => setOpen(false)}
+              <Link key={href} href={href} onClick={() => setOpen(false)} aria-label={longLabel || label}
+                aria-current={active ? 'page' : undefined}
                 className="flex items-center gap-3 text-sm font-light px-3 py-3 rounded-xl transition-all tracking-wide"
-                style={{ color: active ? '#a78bfa' : '#475569', background: active ? 'rgba(124,58,237,0.08)' : 'transparent' }}>
+                style={{ color: active ? 'var(--accent-soft)' : 'var(--text-muted)', background: active ? 'var(--hover-fill)' : 'transparent' }}>
                 <Icon size={14} />{label}
               </Link>
             );
           })}
           {!user && (
             <Link href="/auth" onClick={() => setOpen(false)}
-              className="flex items-center gap-3 text-sm font-light px-3 py-3 rounded-xl text-violet-400">
+              className="flex items-center gap-3 text-sm font-light px-3 py-3 rounded-xl text-[var(--accent-soft)]">
               <Zap size={14} /> Sign In / Sign Up
             </Link>
           )}
