@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `You are an expert video director and social media content strategist for Indian small businesses. You write scripts a shop owner can film on a phone today: exact shots, exact spoken words, no jargon.
 ${languagePrompt(language)}
 ${festivalPrompt(festival, [productDescription, style].filter(Boolean).join(' '))}
+CRITICAL CURRENT YEAR CONSTRAINT: The current calendar year is 2026. NEVER output '2024' or past years in video titles, hooks, voiceover lines, or overlays. Any festive season, collection, or offer is in 2026 (or 2027).
 EVERY scene must visually reference the ACTUAL product/service details from the brief (dish names, materials, city, offer) — a scene that could belong to any business is a failure. text_overlay is the caption burned onto the video for that scene: 3-7 punchy English words, not a stage direction. The visual field of each scene is used VERBATIM as the AI image-generation prompt for that scene — write it as a concrete, filmable shot description (subject, action, setting, lighting), never a vague instruction. The voiceover_script, hook_line, scene voiceovers, text overlays, caption and cta must all be in English (Indian English phrasing). NEVER invent offers, discounts, delivery promises, locations or ingredients the owner did not state — if there is no offer, make the CTA about visiting/enquiring/ordering. Field names stay English. Respond ONLY with valid JSON — no markdown, no code fences.`;
 
     const prompt = `Create a complete video production package for "${businessName}" (${category}).
@@ -77,6 +78,7 @@ Respond ONLY in valid JSON (no markdown):
 
     // ── Coerce: the page calls .map() on scenes/hashtags and .replace() on
     // title directly, so every field must exist with the right type. ──
+    const cleanYear = (s: string) => s.replace(/\b202[0-5]\b/g, '2026');
     const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
     const scenes = Array.isArray(raw.scenes)
       ? raw.scenes.slice(0, 20).map((s, i) => {
@@ -84,24 +86,24 @@ Respond ONLY in valid JSON (no markdown):
           return {
             scene_number: num(o.scene_number) || i + 1,
             duration_seconds: num(o.duration_seconds),
-            shot_type: str(o.shot_type),
-            visual: str(o.visual),
-            voiceover: str(o.voiceover),
-            text_overlay: str(o.text_overlay),
+            shot_type: cleanYear(str(o.shot_type)),
+            visual: cleanYear(str(o.visual)),
+            voiceover: cleanYear(str(o.voiceover)),
+            text_overlay: cleanYear(str(o.text_overlay)),
             music_mood: str(o.music_mood),
           };
         })
       : [];
 
     return NextResponse.json({
-      title: str(raw.title) || `${businessName} — ${platform} video`,
-      hook_line: str(raw.hook_line),
-      voiceover_script: str(raw.voiceover_script),
+      title: cleanYear(str(raw.title)) || `${businessName} — ${platform} video`,
+      hook_line: cleanYear(str(raw.hook_line)),
+      voiceover_script: cleanYear(str(raw.voiceover_script)),
       scenes,
-      caption: str(raw.caption),
+      caption: cleanYear(str(raw.caption)),
       hashtags: strArr(raw.hashtags, 30),
-      thumbnail_idea: str(raw.thumbnail_idea),
-      cta: str(raw.cta),
+      thumbnail_idea: cleanYear(str(raw.thumbnail_idea)),
+      cta: cleanYear(str(raw.cta)),
       editing_tips: strArr(raw.editing_tips, 10),
       music_suggestion: str(raw.music_suggestion),
       b_roll_list: strArr(raw.b_roll_list, 12),

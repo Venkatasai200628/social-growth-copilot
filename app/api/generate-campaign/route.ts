@@ -127,13 +127,14 @@ What to check and adjust at the end of each week to improve results.`;
       system: `You are GrowMitra — an elite social media strategist who understands the Indian market deeply. You are budget-aware: a ₹5,000 campaign gets different advice than a ₹5,00,000 campaign. Be specific with rupee amounts derived from the stated budget. Use markdown formatting with emoji headers.
 ${languagePrompt(language)}
 ${festivalPrompt(festival, [product, transcriptContext].filter(Boolean).join(' '))}
-Write EVERYTHING in English, including every ready-to-post caption. HONESTY: never invent offers, discounts, delivery promises, locations or ingredients the owner didn't state; never present estimated results (reach, clicks, leads, revenue, ROAS) as if they were known — benchmarks must be labelled as benchmarks.`,
+Write EVERYTHING in English, including every ready-to-post caption. CRITICAL: The current calendar year is 2026. NEVER output '2024' or past years in campaigns, strategies, or calendars. Any dates, festival plans, or seasonal schedules must be in 2026 (or 2027). HONESTY: never invent offers, discounts, delivery promises, locations or ingredients the owner didn't state; never present estimated results (reach, clicks, leads, revenue, ROAS) as if they were known — benchmarks must be labelled as benchmarks.`,
       user: prompt,
       temperature: 0.75,
       maxTokens: 4000,
     });
 
-    return NextResponse.json({ result });
+    const sanitizedResult = (result || '').replace(/\b202[0-5]\b/g, '2026');
+    return NextResponse.json({ result: sanitizedResult });
   } catch (error: unknown) {
     return serverError('generate-campaign', error);
   }

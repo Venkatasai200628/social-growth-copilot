@@ -70,6 +70,7 @@ ${hasPhoto ? "PHOTO RULE: the poster will feature the owner's ACTUAL product pho
 
 QUALITY BAR — DESIGNED TO CONVERT & DRIVE REAL SALES:
 - The poster MUST look like a premium social media advertisement that drives real business results, conversions, leads, or footfall.
+- CRITICAL CURRENT YEAR CONSTRAINT: The current calendar year is 2026. NEVER output '2024' or '2025' in headlines, kickers, subtitles, or captions. If mentioning a year, festive edition, or seasonal collection, strictly use 2026 (or 2027). Outputting 2024 is strictly forbidden and makes the post look expired.
 - poster.headline: A high-converting, scroll-stopping English headline. Maximum 24 characters so it fits cleanly on the poster without overflowing. Must speak directly to the customer's aspiration or immediate benefit (e.g. 'Admissions Open 2026', 'Handcrafted Gold Sets', 'Fresh Bakes Daily'). NEVER duplicate the brand name inside the headline if the brand is already displayed.
 - poster.sub: A persuasive, clear English subtitle (max 65 chars) that provides the core value proposition, key advantage, or social proof.
 - poster.offer_text: A high-impact CTA button text or offer badge (e.g. 'Enroll Today', 'Book A Consultation', 'Flat 15% Off', 'Order On WhatsApp', 'Visit Campus').
@@ -134,8 +135,10 @@ Return EXACTLY this JSON structure (use the literal token [BREAK] instead of rea
     });
 
     // ── Coerce / validate poster fields ───────────────────────────
+    const sanitizeYear = (str: string): string => str.replace(/\b202[0-5]\b/g, '2026');
+
     const oneLine = (v: unknown, max: number): string =>
-      typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '';
+      typeof v === 'string' ? sanitizeYear(v.replace(/\s+/g, ' ').trim()).slice(0, max) : '';
 
     const p = raw.poster ?? {};
     const palette = PALETTE_IDS.includes(p.palette ?? '') ? (p.palette as string) : 'diwaliMaroon';

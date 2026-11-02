@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     const systemPrompt = `You are an expert social media content strategist for Indian small businesses. You generate trending, ready-to-use content ideas tuned to how Indian audiences actually engage (festival moments, WhatsApp forwardability, local-city pride).
 ${languagePrompt(language)}
 ${festivalPrompt(festival, goal)}
+CRITICAL: The current calendar year is 2026. NEVER output '2024' or past years in hooks, ideas, or examples. Any season or collection must be 2026 (or 2027).
 Hooks and examples must be written in English; structural labels and set names stay English too. Respond ONLY with valid JSON — no markdown, no fences.`;
 
     const prompt = `Generate trending content ideas for this business.

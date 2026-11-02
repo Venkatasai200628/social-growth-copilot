@@ -8,16 +8,14 @@ import { Zap, LayoutDashboard, Star, MessageCircle, Calendar, Home,
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from './ThemeProvider';
 
-// Internal tools shown only when user is authenticated
-const appNavLinks: { href: string; label: string; longLabel?: string; icon: typeof Zap }[] = [
-  { href: '/home', label: 'Home', longLabel: 'Home', icon: Home },
-  { href: '/my-campaigns', label: 'Campaigns', icon: LayoutDashboard },
-  { href: '/post-studio', label: 'Post Studio', icon: ImageIcon },
-  { href: '/video-studio', label: 'Video Studio', longLabel: 'Video Studio', icon: Film },
-  { href: '/campaign', label: 'Campaign', longLabel: 'Campaign Generator', icon: Zap },
-  { href: '/festivals', label: 'Festivals', longLabel: 'Festival Calendar', icon: Calendar },
-  { href: '/scorer', label: 'Scorer', longLabel: 'Virality Scorer', icon: Star },
-  { href: '/reply-agent', label: 'Replies', longLabel: 'Reply Agent', icon: MessageCircle },
+// Internal studio tools grouped inside the Tools dropdown
+const studioTools = [
+  { href: '/post-studio', label: 'Post Studio', desc: 'AI festival posters, 1:1, 4:5 & 9:16', icon: ImageIcon, color: 'var(--accent-soft)' },
+  { href: '/video-studio', label: 'Video Studio', desc: 'DistilBook motion explainers & promo reels', icon: Film, color: 'var(--neon)' },
+  { href: '/campaign', label: 'Campaign Generator', desc: 'Multi-day plan with budget split', icon: Zap, color: 'var(--gold)' },
+  { href: '/festivals', label: 'Festival Calendar', desc: '18+ Indian shopping festivals', icon: Calendar, color: '#f59e0b' },
+  { href: '/scorer', label: 'Virality Scorer', desc: 'A/B test hooks & captions head-to-head', icon: Star, color: '#eab308' },
+  { href: '/reply-agent', label: 'Reply Agent', desc: 'Brand-safe customer comment & DM replies', icon: MessageCircle, color: '#25d366' },
 ];
 
 // Public navigation shown when visitor is not logged in
@@ -35,8 +33,10 @@ export default function Navbar() {
   const { theme, toggle: toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+  const [toolsMenu, setToolsMenu] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -47,6 +47,7 @@ export default function Navbar() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setUserMenu(false);
+      if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) setToolsMenu(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -82,22 +83,78 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-0.5">
+        <div className="hidden md:flex items-center gap-1">
           {user ? (
-            appNavLinks.map(({ href, label, longLabel, icon: Icon }) => {
-              const active = pathname === href || pathname.startsWith(href + '/');
-              return (
-                <Link key={href} href={href} aria-label={longLabel || label} aria-current={active ? 'page' : undefined}
-                  className="flex items-center gap-1.5 text-xs font-light px-3 py-2 rounded-xl transition-all tracking-wide"
+            <>
+              {/* Dashboard Home */}
+              <Link href="/home" aria-current={pathname === '/home' ? 'page' : undefined}
+                className="flex items-center gap-1.5 text-xs font-light px-3.5 py-2 rounded-xl transition-all tracking-wide"
+                style={{
+                  background: pathname === '/home' ? 'var(--hover-fill)' : 'transparent',
+                  color: pathname === '/home' ? 'var(--accent-soft)' : 'var(--text-muted)',
+                  border: pathname === '/home' ? '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' : '1px solid transparent',
+                }}>
+                <Home size={12} /> Dashboard
+              </Link>
+
+              {/* My Campaigns */}
+              <Link href="/my-campaigns" aria-current={pathname === '/my-campaigns' ? 'page' : undefined}
+                className="flex items-center gap-1.5 text-xs font-light px-3.5 py-2 rounded-xl transition-all tracking-wide"
+                style={{
+                  background: pathname === '/my-campaigns' ? 'var(--hover-fill)' : 'transparent',
+                  color: pathname === '/my-campaigns' ? 'var(--accent-soft)' : 'var(--text-muted)',
+                  border: pathname === '/my-campaigns' ? '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' : '1px solid transparent',
+                }}>
+                <LayoutDashboard size={12} /> Campaigns
+              </Link>
+
+              {/* Tools Dropdown */}
+              <div className="relative" ref={toolsRef}>
+                <button
+                  onClick={() => setToolsMenu(!toolsMenu)}
+                  className="flex items-center gap-1.5 text-xs font-light px-3.5 py-2 rounded-xl transition-all tracking-wide"
                   style={{
-                    background: active ? 'var(--hover-fill)' : 'transparent',
-                    color: active ? 'var(--accent-soft)' : 'var(--text-muted)',
-                    border: active ? '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' : '1px solid transparent',
-                  }}>
-                  <Icon size={11} />{label}
-                </Link>
-              );
-            })
+                    background: studioTools.some(t => pathname === t.href || pathname.startsWith(t.href + '/')) || toolsMenu ? 'var(--hover-fill)' : 'transparent',
+                    color: studioTools.some(t => pathname === t.href || pathname.startsWith(t.href + '/')) || toolsMenu ? 'var(--accent-soft)' : 'var(--text-muted)',
+                    border: studioTools.some(t => pathname === t.href || pathname.startsWith(t.href + '/')) || toolsMenu ? '1px solid color-mix(in srgb, var(--accent) 20%, transparent)' : '1px solid transparent',
+                  }}
+                >
+                  <Sparkles size={12} /> Studio Tools <ChevronDown size={11} className={`transition-transform duration-200 ${toolsMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {toolsMenu && (
+                  <div className="absolute left-0 top-full mt-2 w-80 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-2 z-50 animate-fade-in space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+                      Marketing & Content Studios
+                    </div>
+                    {studioTools.map(({ href, label, desc, icon: Icon, color }) => {
+                      const active = pathname === href;
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setToolsMenu(false)}
+                          className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-[var(--hover-fill)] transition-all group text-left"
+                          style={{ background: active ? 'var(--hover-fill)' : 'transparent' }}
+                        >
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                            style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
+                            <Icon size={14} style={{ color }} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-medium text-[var(--text)] group-hover:text-[var(--accent-soft)] transition-colors flex items-center gap-1.5">
+                              {label}
+                              {active && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}
+                            </div>
+                            <div className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">{desc}</div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
             publicNavLinks.map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href}
@@ -110,6 +167,14 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {user && (
+            <Link
+              href="/post-studio"
+              className="hidden lg:flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full text-white shadow-md shadow-[var(--accent)]/20 transition-all hover:opacity-90 tracking-wide [background:linear-gradient(135deg,var(--accent),var(--accent-soft))]"
+            >
+              <ImageIcon size={11} /> Create Post
+            </Link>
+          )}
           <button onClick={toggleTheme} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             className="w-8 h-8 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] hover:bg-[var(--hover-fill)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition-all">
             {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
@@ -185,14 +250,28 @@ export default function Navbar() {
         <div id="mobile-nav-menu" className="md:hidden border-t border-[var(--border)] bg-[var(--bg)] px-6 py-4 space-y-1">
           {user ? (
             <>
-              {appNavLinks.map(({ href, label, longLabel, icon: Icon }) => {
+              <Link href="/home" onClick={() => setOpen(false)}
+                className="flex items-center gap-3 text-sm font-light px-3 py-2.5 rounded-xl transition-all tracking-wide"
+                style={{ color: pathname === '/home' ? 'var(--accent-soft)' : 'var(--text-muted)', background: pathname === '/home' ? 'var(--hover-fill)' : 'transparent' }}>
+                <Home size={14} /> Dashboard Home
+              </Link>
+              <Link href="/my-campaigns" onClick={() => setOpen(false)}
+                className="flex items-center gap-3 text-sm font-light px-3 py-2.5 rounded-xl transition-all tracking-wide"
+                style={{ color: pathname === '/my-campaigns' ? 'var(--accent-soft)' : 'var(--text-muted)', background: pathname === '/my-campaigns' ? 'var(--hover-fill)' : 'transparent' }}>
+                <LayoutDashboard size={14} /> My Campaigns
+              </Link>
+
+              <div className="pt-2 pb-1 px-3 text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+                Creative Tools
+              </div>
+
+              {studioTools.map(({ href, label, icon: Icon, color }) => {
                 const active = pathname === href;
                 return (
-                  <Link key={href} href={href} onClick={() => setOpen(false)} aria-label={longLabel || label}
-                    aria-current={active ? 'page' : undefined}
-                    className="flex items-center gap-3 text-sm font-light px-3 py-2.5 rounded-xl transition-all tracking-wide"
+                  <Link key={href} href={href} onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 text-sm font-light px-3 py-2 rounded-xl transition-all tracking-wide"
                     style={{ color: active ? 'var(--accent-soft)' : 'var(--text-muted)', background: active ? 'var(--hover-fill)' : 'transparent' }}>
-                    <Icon size={14} />{label}
+                    <Icon size={14} style={{ color }} /> {label}
                   </Link>
                 );
               })}

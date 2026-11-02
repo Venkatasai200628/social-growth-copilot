@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Film, ChevronDown, Sparkles, AlertCircle, RefreshCw, Download, Clock, Music, Camera,
   Fish, Target, Mic, PenLine, Image as ImageIcon, Clapperboard, Scissors, Megaphone,
-  Edit3, Check, Palette, Layers } from 'lucide-react';
+  Edit3, Check, Palette, Layers, Layout, Monitor } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card, Field, inputCls, CopyButton, Skeleton, Tabs, PageHeader, EmptyState } from '../components/ui';
 import { authFetch } from '@/lib/client';
-import { renderPromoVideo, downloadVideo, RenderResult, VIDEO_THEMES, VIDEO_TRANSITIONS, TransitionType } from '@/lib/video';
+import { renderPromoVideo, downloadVideo, RenderResult, VIDEO_THEMES, VIDEO_TRANSITIONS,
+  VIDEO_FORMAT_STYLES, ASPECT_RATIOS, VideoFormatStyle, AspectRatioType, TransitionType } from '@/lib/video';
 import PhotoPicker from './PhotoPicker';
 import { CATEGORIES } from '@/lib/types';
 
@@ -74,7 +75,9 @@ function VideoStudioInner() {
   // AI voiceover options for the promo video
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
-  // Visual theme & scene transitions
+  // Visual theme, format style, aspect ratio & transitions
+  const [selectedFormat, setSelectedFormat] = useState<VideoFormatStyle>('motionExplainer');
+  const [selectedAspect, setSelectedAspect] = useState<AspectRatioType>('9:16');
   const [selectedTheme, setSelectedTheme] = useState<string>('royalGold');
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>('crossfade');
   const [editingTitle, setEditingTitle] = useState(false);
@@ -127,6 +130,8 @@ function VideoStudioInner() {
           cta: form.goal === 'Drive Sales' ? 'Order Now' : 'Follow for more',
           paletteId: selectedTheme,
           transition: selectedTransition,
+          videoStyle: selectedFormat,
+          aspect: selectedAspect,
           secondsPerScene: 2.6,
           voiceover: voiceOn
             ? {
@@ -388,38 +393,51 @@ function VideoStudioInner() {
                       </Button>
                     </div>
 
-                    {/* Controls grid: Voice, Theme, Transition */}
-                    <div className="mt-4 pt-3 border-t border-[var(--border)] grid sm:grid-cols-3 gap-3">
-                      {/* Voice options */}
+                    {/* Controls grid: Format Style, Aspect Ratio, Theme, Transition & Voice */}
+                    <div className="mt-4 pt-3 border-t border-[var(--border)] grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {/* Format Style */}
                       <div className="space-y-1">
-                        <label className="flex items-center gap-2 text-xs text-[var(--text-soft)] cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={voiceOn}
-                            onChange={(e) => setVoiceOn(e.target.checked)}
-                            className="w-3.5 h-3.5 accent-[var(--neon)] cursor-pointer"
-                          />
-                          <Mic size={12} /> AI voiceover
+                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
+                          <Layout size={12} className="text-[var(--neon)]" /> Video Format
                         </label>
-                        {voiceOn && (
-                          <div className="relative mt-1">
-                            <select
-                              aria-label="Voice"
-                              className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                              value={voiceGender}
-                              onChange={(e) => setVoiceGender(e.target.value as 'female' | 'male')}
-                            >
-                              <option value="female">Female voice</option>
-                              <option value="male">Male voice</option>
-                            </select>
-                            <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
-                          </div>
-                        )}
+                        <div className="relative mt-1">
+                          <select
+                            aria-label="Video Format Style"
+                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                            value={selectedFormat}
+                            onChange={(e) => setSelectedFormat(e.target.value as VideoFormatStyle)}
+                          >
+                            {VIDEO_FORMAT_STYLES.map((fs) => (
+                              <option key={fs.id} value={fs.id}>{fs.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                        </div>
+                      </div>
+
+                      {/* Aspect Ratio */}
+                      <div className="space-y-1">
+                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
+                          <Monitor size={12} className="text-[var(--accent-soft)]" /> Dimensions
+                        </label>
+                        <div className="relative mt-1">
+                          <select
+                            aria-label="Aspect Ratio"
+                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                            value={selectedAspect}
+                            onChange={(e) => setSelectedAspect(e.target.value as AspectRatioType)}
+                          >
+                            {ASPECT_RATIOS.map((ar) => (
+                              <option key={ar.id} value={ar.id}>{ar.label}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                        </div>
                       </div>
 
                       {/* Theme / Palette */}
                       <div className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5">
+                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
                           <Palette size={12} className="text-[var(--gold)]" /> Design Theme
                         </label>
                         <div className="relative mt-1">
@@ -437,9 +455,9 @@ function VideoStudioInner() {
                         </div>
                       </div>
 
-                      {/* Scene Transitions */}
+                      {/* Scene Transitions & Voice */}
                       <div className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5">
+                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
                           <Layers size={12} className="text-[var(--accent-soft)]" /> Transitions
                         </label>
                         <div className="relative mt-1">
@@ -456,6 +474,33 @@ function VideoStudioInner() {
                           <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
                         </div>
                       </div>
+                    </div>
+
+                    {/* Secondary row: Voice narration options */}
+                    <div className="mt-3 pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
+                      <label className="flex items-center gap-2 text-xs text-[var(--text-soft)] cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={voiceOn}
+                          onChange={(e) => setVoiceOn(e.target.checked)}
+                          className="w-3.5 h-3.5 accent-[var(--neon)] cursor-pointer"
+                        />
+                        <Mic size={12} /> Synchronized AI narration
+                      </label>
+                      {voiceOn && (
+                        <div className="relative">
+                          <select
+                            aria-label="Voice"
+                            className="appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-full pl-3 pr-7 py-1 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                            value={voiceGender}
+                            onChange={(e) => setVoiceGender(e.target.value as 'female' | 'male')}
+                          >
+                            <option value="female">Female narration</option>
+                            <option value="male">Male narration</option>
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                        </div>
+                      )}
                     </div>
                     {videoBusy && (
                       <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden mt-3">

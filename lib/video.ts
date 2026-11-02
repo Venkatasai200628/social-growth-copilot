@@ -34,6 +34,20 @@ export interface VoiceoverSpec {
 }
 
 export type TransitionType = 'crossfade' | 'slide' | 'zoom' | 'fadeBlack';
+export type VideoFormatStyle = 'motionExplainer' | 'whiteboard' | 'cinematic';
+export type AspectRatioType = '9:16' | '16:9' | '1:1';
+
+export const VIDEO_FORMAT_STYLES: { id: VideoFormatStyle; name: string; desc: string; badge: string }[] = [
+  { id: 'motionExplainer', name: 'DistilBook Motion Explainer', desc: 'Chapter progress bars, floating framed showcase card & kinetic subtitle capsule', badge: 'Recommended' },
+  { id: 'whiteboard', name: 'DistilBook Whiteboard Explainer', desc: 'Clean bright minimalist canvas, sketch frames & diagrammatic callouts', badge: 'Clean' },
+  { id: 'cinematic', name: 'Cinematic Reel Cover', desc: 'Full-bleed Ken-Burns zoom, dramatic bottom scrim & bold lower-third', badge: 'Classic' },
+];
+
+export const ASPECT_RATIOS: { id: AspectRatioType; label: string; ratio: string }[] = [
+  { id: '9:16', label: '9:16 Reels / Shorts', ratio: '1080×1920' },
+  { id: '16:9', label: '16:9 Landscape', ratio: '1920×1080' },
+  { id: '1:1', label: '1:1 Square Feed', ratio: '1080×1080' },
+];
 
 export interface VideoTheme {
   id: string;
@@ -78,6 +92,10 @@ export interface VideoSpec {
   voiceover?: VoiceoverSpec | null;
   /** Scene transition style */
   transition?: TransitionType;
+  /** Video presentation format: DistilBook motion explainer, whiteboard or cinematic */
+  videoStyle?: VideoFormatStyle;
+  /** Video aspect ratio */
+  aspect?: AspectRatioType;
 }
 
 export interface RenderResult {
@@ -220,6 +238,179 @@ function drawSceneText(
   ctx.restore();
 }
 
+function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+}
+
+/** DistilBook-style segmented chapter progress bar across the top */
+function drawChapterBars(
+  ctx: CanvasRenderingContext2D,
+  currentIdx: number,
+  localProgress: number,
+  totalScenes: number,
+  w: number,
+  accentColor: string,
+  isWhiteboard: boolean
+) {
+  const barTop = 45;
+  const barHeight = 8;
+  const margin = 50;
+  const gap = 10;
+  const availableW = w - margin * 2;
+  const segW = (availableW - gap * (totalScenes - 1)) / totalScenes;
+
+  ctx.save();
+  for (let i = 0; i < totalScenes; i++) {
+    const x = margin + i * (segW + gap);
+    // Background track
+    ctx.fillStyle = isWhiteboard ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.2)';
+    drawRoundRect(ctx, x, barTop, segW, barHeight, 4);
+    ctx.fill();
+
+    // Filled portion
+    let fill = 0;
+    if (i < currentIdx) fill = 1;
+    else if (i === currentIdx) fill = Math.min(1, Math.max(0, localProgress));
+
+    if (fill > 0) {
+      ctx.fillStyle = accentColor;
+      drawRoundRect(ctx, x, barTop, segW * fill, barHeight, 4);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/** DistilBook floating showcase card for product image or vector motif */
+function drawDistilShowcaseCard(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement | null,
+  w: number,
+  h: number,
+  p: ReturnType<typeof paletteOf>,
+  local: number,
+  isWhiteboard: boolean
+) {
+  const cardMargin = 60;
+  const cardX = cardMargin;
+  const cardY = h * 0.11;
+  const cardW = w - cardMargin * 2;
+  const cardH = h > 1400 ? h * 0.44 : h * 0.46;
+  const radius = 32;
+
+  ctx.save();
+  // Ambient drop shadow / glow
+  ctx.shadowColor = isWhiteboard ? 'rgba(0, 0, 0, 0.08)' : `${p.accent}33`;
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 12;
+
+  // Background
+  ctx.fillStyle = isWhiteboard ? '#ffffff' : '#0b0f19';
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.fill();
+  ctx.shadowBlur = 0; // reset shadow
+
+  // Clip content inside rounded card
+  ctx.save();
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.clip();
+
+  if (img) {
+    const zoom = 1.02 + 0.06 * local;
+    const s = Math.max(cardW / img.width, cardH / img.height) * zoom;
+    const dw = img.width * s;
+    const dh = img.height * s;
+    const dx = cardX + (cardW - dw) / 2;
+    const dy = cardY + (cardH - dh) / 2 - 10 * local;
+    ctx.drawImage(img, dx, dy, dw, dh);
+  } else {
+    // Elegant graphic vector backdrop
+    const grad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    grad.addColorStop(0, p.bg1);
+    grad.addColorStop(1, p.bg2);
+    ctx.fillStyle = grad;
+    ctx.fillRect(cardX, cardY, cardW, cardH);
+
+    // Glowing concentric rings
+    ctx.strokeStyle = p.accent;
+    ctx.globalAlpha = 0.22;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cardX + cardW / 2, cardY + cardH / 2, 100 + 20 * Math.sin(local * Math.PI), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cardX + cardW / 2, cardY + cardH / 2, 200 + 30 * Math.sin(local * Math.PI), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore(); // end clip
+
+  // Card outline border
+  ctx.strokeStyle = isWhiteboard ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.22)';
+  ctx.lineWidth = 2;
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, radius);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/** DistilBook-style spoken subtitle capsule pill */
+function drawDistilSubtitleCapsule(
+  ctx: CanvasRenderingContext2D,
+  subtitle: string,
+  w: number,
+  h: number,
+  local: number,
+  isWhiteboard: boolean
+) {
+  const capsuleY = h - 290;
+  const slide = (1 - Math.min(1, local * 2.5)) * 30;
+  const alpha = Math.min(1, local * 2.5);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  ctx.font = `600 34px ${INDIC}`;
+  const lines = wrap(ctx, `🎙️ "${subtitle}"`, w - 160, 2);
+  const boxW = w - 120;
+  const boxH = Math.max(86, lines.length * 44 + 32);
+  const boxX = 60;
+  const boxY = capsuleY + slide;
+
+  // Capsule container
+  ctx.fillStyle = isWhiteboard ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.88)';
+  ctx.strokeStyle = isWhiteboard ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.18)';
+  ctx.lineWidth = 1.5;
+  drawRoundRect(ctx, boxX, boxY, boxW, boxH, 24);
+  ctx.fill();
+  ctx.stroke();
+
+  // Subtitle text
+  ctx.fillStyle = isWhiteboard ? '#1e293b' : '#f8fafc';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  lines.forEach((l, i) => {
+    ctx.fillText(l, boxX + 26, boxY + 16 + i * 42);
+  });
+
+  ctx.restore();
+}
+
 interface VoiceAudio {
   ctx: AudioContext;
   buffer: AudioBuffer;
@@ -289,11 +480,24 @@ export async function renderPromoVideo(
     spec.voiceover && spec.voiceover.text.trim() ? await prepareVoiceAudio(spec.voiceover) : null;
 
   // 3. recorder setup
+  const aspect = spec.aspect ?? '9:16';
+  let canvasW = 1080;
+  let canvasH = 1920;
+  if (aspect === '16:9') {
+    canvasW = 1920;
+    canvasH = 1080;
+  } else if (aspect === '1:1') {
+    canvasW = 1080;
+    canvasH = 1080;
+  }
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = canvasW;
+  canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas is not available in this browser.');
+
+  const W = canvasW;
+  const H = canvasH;
 
   const canvasStream = canvas.captureStream(30);
   // mix the decoded narration into the recorded stream when available
@@ -328,20 +532,40 @@ export async function renderPromoVideo(
   }
   const totalMs = totalScenes * sps * 1000;
 
+  const formatStyle = spec.videoStyle ?? 'motionExplainer';
+  const isWhiteboard = formatStyle === 'whiteboard';
+
   const bgFill = (t: number) => {
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    const k = 0.5 + 0.5 * Math.sin(t * 0.7);
-    g.addColorStop(0, p.bg1);
-    g.addColorStop(1, p.bg2);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    // soft moving glow keeps gradient scenes alive
-    const glow = ctx.createRadialGradient(W * (0.3 + 0.4 * k), H * 0.3, 40, W * 0.5, H * 0.45, H * 0.6);
-    glow.addColorStop(0, `${p.accent}26`);
-    glow.addColorStop(1, 'transparent');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, W, H);
-    void t;
+    if (isWhiteboard) {
+      // Clean bright whiteboard background
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(1, '#f1f5f9');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // Subtle grid dots for whiteboard aesthetic
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.035)';
+      for (let x = 40; x < W; x += 60) {
+        for (let y = 40; y < H; y += 60) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      const k = 0.5 + 0.5 * Math.sin(t * 0.7);
+      g.addColorStop(0, p.bg1);
+      g.addColorStop(1, p.bg2);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // soft moving glow keeps gradient scenes alive
+      const glow = ctx.createRadialGradient(W * (0.3 + 0.4 * k), H * 0.3, 40, W * 0.5, H * 0.45, H * 0.6);
+      glow.addColorStop(0, `${p.accent}26`);
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+    }
   };
 
   // 4. animate + record
@@ -373,42 +597,143 @@ export async function renderPromoVideo(
     const drawSceneLayer = (sceneIdx: number, localProgress: number, timeVal: number) => {
       if (sceneIdx < spec.scenes.length) {
         const img = images[sceneIdx];
-        if (img) {
-          // Ken-Burns: slow zoom in, slight drift
-          const zoom = 1.05 + 0.12 * localProgress;
-          const dy = -30 * localProgress;
-          drawCover(ctx, img, 1, zoom, dy);
-        } else {
-          // gradient scene: big centered scene number motif
+        const scene = spec.scenes[sceneIdx];
+
+        if (formatStyle === 'motionExplainer' || formatStyle === 'whiteboard') {
+          // ── DistilBook Motion / Whiteboard Explainer ──
+          // 1. Top Chapter progress bar
+          drawChapterBars(ctx, sceneIdx, localProgress, totalScenes, W, p.accent, isWhiteboard);
+
+          // 2. Top Chapter Tag Pill
           ctx.save();
-          ctx.globalAlpha = 0.12;
+          ctx.font = `700 22px ${SANS}`;
+          const chapterText = `CHAPTER ${sceneIdx + 1} OF ${spec.scenes.length}`;
+          const pillW = ctx.measureText(chapterText).width + 50;
+          const pillX = (W - pillW) / 2;
+          ctx.fillStyle = isWhiteboard ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)';
+          ctx.strokeStyle = isWhiteboard ? 'rgba(0,0,0,0.14)' : `${p.accent}88`;
+          ctx.lineWidth = 1.5;
+          drawRoundRect(ctx, pillX, 72, pillW, 36, 18);
+          ctx.fill();
+          ctx.stroke();
           ctx.fillStyle = p.accent;
           ctx.beginPath();
-          ctx.arc(W / 2, H * 0.42, 300 + 60 * Math.sin(timeVal / 600), 0, 7);
+          ctx.arc(pillX + 18, 90, 4, 0, Math.PI * 2);
           ctx.fill();
+          ctx.fillStyle = isWhiteboard ? '#1e293b' : '#ffffff';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(chapterText, pillX + 30, 90);
           ctx.restore();
+
+          // 3. Central Framed Showcase Card (images stay complete without getting cropped)
+          drawDistilShowcaseCard(ctx, img, W, H, p, localProgress, isWhiteboard);
+
+          // 4. Kinetic Typography (Scene Title)
+          const titleY = H > 1400 ? H * 0.58 : H * 0.60;
+          const slide = (1 - Math.min(1, localProgress * 2.2)) * 40;
+          const titleAlpha = Math.min(1, localProgress * 2.2);
+          ctx.save();
+          ctx.globalAlpha = titleAlpha;
+          ctx.fillStyle = p.accent;
+          ctx.fillRect(70, titleY + slide, 80, 8);
+
+          let size = 68;
+          ctx.font = `900 ${size}px ${DISPLAY}`;
+          while (ctx.measureText(scene.title).width > W - 140 && size > 36) {
+            size -= 4;
+            ctx.font = `900 ${size}px ${DISPLAY}`;
+          }
+          const tLines = wrap(ctx, scene.title, W - 140, 2);
+          ctx.fillStyle = isWhiteboard ? '#0f172a' : '#ffffff';
+          ctx.textBaseline = 'top';
+          tLines.forEach((l, i) => ctx.fillText(l, 70, titleY + slide + 20 + i * (size * 1.12)));
+          ctx.restore();
+
+          // 5. DistilBook Voiceover Subtitle Capsule
+          if (scene.subtitle) {
+            drawDistilSubtitleCapsule(ctx, scene.subtitle, W, H, localProgress, isWhiteboard);
+          }
+        } else {
+          // ── Cinematic Full-Bleed Reel ──
+          if (img) {
+            const zoom = 1.05 + 0.12 * localProgress;
+            const dy = -30 * localProgress;
+            drawCover(ctx, img, 1, zoom, dy);
+          } else {
+            ctx.save();
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = p.accent;
+            ctx.beginPath();
+            ctx.arc(W / 2, H * 0.42, 300 + 60 * Math.sin(timeVal / 600), 0, 7);
+            ctx.fill();
+            ctx.restore();
+          }
+          drawSceneText(ctx, p, scene.title, scene.subtitle, localProgress);
         }
-        drawSceneText(ctx, p, spec.scenes[sceneIdx].title, spec.scenes[sceneIdx].subtitle, localProgress);
       } else {
-        // ── final CTA card ──
+        // ── final CTA Outro Card ──
+        if (formatStyle === 'motionExplainer' || formatStyle === 'whiteboard') {
+          drawChapterBars(ctx, totalScenes - 1, 1, totalScenes, W, p.accent, isWhiteboard);
+        }
+
         ctx.save();
         ctx.globalAlpha = Math.min(1, localProgress * 2);
-        let size = 120;
+
+        // Outro Card Container
+        const cardMargin = 80;
+        const cardW = W - cardMargin * 2;
+        const cardH = 680;
+        const cardX = cardMargin;
+        const cardY = (H - cardH) / 2;
+
+        ctx.fillStyle = isWhiteboard ? '#ffffff' : 'rgba(15, 23, 42, 0.92)';
+        ctx.strokeStyle = isWhiteboard ? 'rgba(0,0,0,0.12)' : `${p.accent}55`;
+        ctx.lineWidth = 2;
+        drawRoundRect(ctx, cardX, cardY, cardW, cardH, 36);
+        ctx.fill();
+        ctx.stroke();
+
+        // Badge
+        ctx.fillStyle = `${p.accent}22`;
+        ctx.strokeStyle = p.accent;
+        ctx.lineWidth = 1.5;
+        drawRoundRect(ctx, W / 2 - 150, cardY + 60, 300, 40, 20);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = `700 20px ${SANS}`;
+        ctx.fillStyle = p.accent;
+        ctx.textAlign = 'center';
+        ctx.fillText('SPECIAL OFFER', W / 2, cardY + 86);
+
+        // CTA Title
+        let size = 96;
         ctx.font = `900 ${size}px ${DISPLAY}`;
         const cta = spec.cta.toUpperCase();
-        while (ctx.measureText(cta).width > W - 220 && size > 50) {
-          size -= 6;
+        while (ctx.measureText(cta).width > cardW - 80 && size > 44) {
+          size -= 4;
           ctx.font = `900 ${size}px ${DISPLAY}`;
         }
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(cta, W / 2, H * 0.42);
-        ctx.font = `600 52px ${SANS}`;
+        ctx.fillStyle = isWhiteboard ? '#0f172a' : '#ffffff';
+        ctx.fillText(cta, W / 2, cardY + 220);
+
+        // Business Name
+        ctx.font = `700 48px ${SANS}`;
         ctx.fillStyle = p.accent;
-        ctx.fillText(spec.businessName.toUpperCase(), W / 2, H * 0.42 + size + 60);
-        ctx.font = `400 34px ${SANS}`;
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.fillText('made with GrowMitra', W / 2, H * 0.42 + size + 140);
+        ctx.fillText(spec.businessName.toUpperCase(), W / 2, cardY + 310);
+
+        // Action Pill
+        ctx.fillStyle = p.accent;
+        drawRoundRect(ctx, W / 2 - 180, cardY + 390, 360, 76, 38);
+        ctx.fill();
+        ctx.font = `800 28px ${SANS}`;
+        ctx.fillStyle = '#000000';
+        ctx.fillText('ENQUIRE NOW →', W / 2, cardY + 438);
+
+        // Watermark
+        ctx.font = `400 26px ${SANS}`;
+        ctx.fillStyle = isWhiteboard ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.6)';
+        ctx.fillText('powered by GrowMitra', W / 2, cardY + 540);
         ctx.restore();
       }
     };
