@@ -354,50 +354,91 @@ function framePhoto(
   x: number, y: number, w: number, h: number, p: Palette, mono: string
 ) {
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,.35)';
-  ctx.shadowBlur = 38;
-  ctx.shadowOffsetY = 14;
-  rr(ctx, x, y, w, h, 26);
-  ctx.fillStyle = p.light ? '#ffffff' : 'rgba(255,255,255,.05)';
+  ctx.shadowColor = 'rgba(0,0,0,.22)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 10;
+  rr(ctx, x, y, w, h, 24);
+  ctx.fillStyle = p.light ? '#ffffff' : 'rgba(255,255,255,.08)';
   ctx.fill();
   ctx.restore();
+
   ctx.save();
-  rr(ctx, x, y, w, h, 26);
+  rr(ctx, x, y, w, h, 24);
   ctx.clip();
   if (img) {
-    const s = Math.max(w / img.width, h / img.height);
-    ctx.drawImage(img, x + (w - img.width * s) / 2, y + (h - img.height * s) / 2, img.width * s, img.height * s);
+    // Fill backing card
+    ctx.fillStyle = p.light ? '#ffffff' : '#1c1c24';
+    ctx.fillRect(x, y, w, h);
+
+    // Smart contain/cover:
+    // If the image has extreme aspect ratio (like wide banner/logo or tall portrait),
+    // contain it with padding so logos and products are never cropped off.
+    const pad = 12;
+    const availW = w - pad * 2;
+    const availH = h - pad * 2;
+    const imgRatio = img.width / img.height;
+    const boxRatio = availW / availH;
+
+    let drawW: number;
+    let drawH: number;
+
+    // Use contain mode so entire product or logo stays 100% visible
+    if (imgRatio > boxRatio) {
+      drawW = availW;
+      drawH = availW / imgRatio;
+    } else {
+      drawH = availH;
+      drawW = availH * imgRatio;
+    }
+
+    const drawX = x + (w - drawW) / 2;
+    const drawY = y + (h - drawH) / 2;
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
   } else {
     monogramPanel(ctx, mono, x, y, w, h, p);
   }
   ctx.restore();
+
+  // Subtle border around photo container
+  ctx.save();
+  ctx.strokeStyle = p.light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1.5;
+  rr(ctx, x, y, w, h, 24);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function footer(ctx: CanvasRenderingContext2D, p: Palette, brand: string, city: string | undefined, W: number, H: number) {
-  const fy = H - M - 64;
+  const fy = H - M - 48;
+  ctx.save();
   ctx.strokeStyle = p.accent;
-  ctx.globalAlpha = 0.45;
-  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(M, fy);
   ctx.lineTo(W - M, fy);
   ctx.stroke();
   ctx.globalAlpha = 1;
-  ctx.font = `700 34px ${POSTER_FONTS.sans}`;
+
+  ctx.font = `700 28px ${POSTER_FONTS.sans}`;
   ctx.fillStyle = p.ink;
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(brand, M, fy + 46, W - M * 2 - 220);
-  const bw = Math.min(ctx.measureText(brand).width, W - M * 2 - 220);
+  ctx.textBaseline = 'middle';
+  const brandY = fy + 28;
+  const maxBrandW = W - M * 2 - 220;
+  ctx.fillText(brand, M, brandY, maxBrandW);
+  const bw = Math.min(ctx.measureText(brand).width, maxBrandW);
+
   if (city) {
-    ctx.font = `500 26px ${POSTER_FONTS.sans}`;
+    ctx.font = `500 22px ${POSTER_FONTS.sans}`;
     ctx.fillStyle = p.sub;
-    ctx.fillText('· ' + city, M + bw + 14, fy + 45);
+    ctx.fillText('· ' + city, M + bw + 12, brandY);
   }
+
   ctx.textAlign = 'right';
-  ctx.font = `800 26px ${POSTER_FONTS.sans}`;
+  ctx.font = `700 22px ${POSTER_FONTS.sans}`;
   ctx.fillStyle = p.accent;
-  ctx.fillText('GrowMitra', W - M, fy + 45);
-  ctx.textAlign = 'left';
+  ctx.fillText('GrowMitra', W - M, brandY);
+  ctx.restore();
 }
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -465,8 +506,11 @@ export async function renderPoster(canvas: HTMLCanvasElement, spec: PosterSpec):
 
     if (hasImg) {
       framePhoto(ctx, img, photoX, photoY, photoW, photoH, p, spec.brand.charAt(0));
-      if (spec.offer) chip(ctx, spec.offer, photoX - 20, photoY + photoH - 33, p, { size: 32, padX: 32, h: 74, maxW: photoW + 40 });
-      diyaRow(ctx, W / 2, H - M - (H > 1400 ? 130 : 120), 3, p);
+      if (spec.offer) {
+        const offerY = Math.min(subY + subLines.length * 62 + 24, H - M - 170);
+        chip(ctx, spec.offer, M, offerY, p, { size: 32, padX: 34, h: 72, maxW: textW });
+      }
+      diyaRow(ctx, W / 2, H - M - 120, 3, p);
     } else {
       // full-width typographic poster — ornament instead of an empty photo box
       const oy = Math.min(subY + subLines.length * 62 + 90, H - M - 210);
@@ -508,7 +552,10 @@ export async function renderPoster(canvas: HTMLCanvasElement, spec: PosterSpec):
 
     if (hasImg) {
       framePhoto(ctx, img, photoX, photoY, photoW, photoH, p, spec.brand.charAt(0));
-      if (spec.offer) chip(ctx, spec.offer, M, Math.min(subY + subLines.length * 58 + 40, H - M - 180), p, { size: 36, padX: 40, h: 84 });
+      if (spec.offer) {
+        const offerY = Math.min(subY + subLines.length * 58 + 30, H - M - 140);
+        chip(ctx, spec.offer, M, offerY, p, { size: 32, padX: 36, h: 72 });
+      }
     } else {
       const oy = Math.min(subY + subLines.length * 58 + 84, H - M - 200);
       ornamentDivider(ctx, p, W / 2, oy, W);
@@ -521,26 +568,38 @@ export async function renderPoster(canvas: HTMLCanvasElement, spec: PosterSpec):
   }
 
   if (spec.layout === 'editorial') {
-    // full-width photo panel on top, editorial text below (mixed case)
-    const panelH = Math.round(H * (spec.format === '9:16' ? 0.5 : 0.52));
+    // Proportional photo panel on top with breathing room so text never collides with footer
+    const hasKicker = !!spec.kicker;
+    const hasOffer = !!spec.offer;
+    const panelH = Math.round(H * (spec.format === '9:16' ? 0.40 : 0.43));
     framePhoto(ctx, img, M, M, W - M * 2, panelH, p, spec.brand.charAt(0));
-    if (spec.kicker) chip(ctx, spec.kicker, M, M + panelH + 42, p, { size: 26, padX: 26, h: 58 });
+
+    let y = M + panelH + 24;
+    if (hasKicker) {
+      chip(ctx, spec.kicker, M, y, p, { size: 24, padX: 24, h: 48 });
+      y += 64;
+    }
 
     const textW = W - M * 2;
-    const { size, lines } = fitHeadline(ctx, spec.headline, textW, 84);
+    const footerTop = H - M - 64;
+
+    const { size, lines } = fitHeadline(ctx, spec.headline, textW, 68);
     ctx.font = `800 ${size}px ${POSTER_FONTS.display}`;
     ctx.fillStyle = p.ink;
     ctx.textBaseline = 'top';
-    let y = M + panelH + 42 + (spec.kicker ? 86 : 0);
-    lines.forEach((l, i) => ctx.fillText(l, M, y + i * (size * 1.1), textW));
-    y += lines.length * (size * 1.1) + 22;
+    lines.forEach((l, i) => ctx.fillText(l, M, y + i * (size * 1.12), textW));
+    y += lines.length * (size * 1.12) + 14;
 
-    ctx.font = `600 38px ${POSTER_FONTS.indic}`;
+    ctx.font = `500 30px ${POSTER_FONTS.sans}`;
     ctx.fillStyle = p.sub;
     const subLines = wrapLines(ctx, spec.sub, textW, 2);
-    subLines.forEach((l, i) => ctx.fillText(l, M, y + i * 56, textW));
-    y += subLines.length * 56 + 34;
-    if (spec.offer) chip(ctx, spec.offer, M, Math.min(y, H - M - 150), p, { size: 34, padX: 36, h: 78 });
+    subLines.forEach((l, i) => ctx.fillText(l, M, y + i * 42, textW));
+    y += subLines.length * 42 + 20;
+
+    if (hasOffer) {
+      const offerY = Math.min(y, footerTop - 64);
+      chip(ctx, spec.offer, M, offerY, p, { size: 28, padX: 30, h: 56 });
+    }
   }
 
   if (spec.layout === 'offer') {

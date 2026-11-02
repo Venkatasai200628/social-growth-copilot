@@ -68,12 +68,15 @@ ${languagePrompt(language)}
 ${festivalPrompt(festival, [productDescription, customPrompt].filter(Boolean).join(' '))}
 ${hasPhoto ? "PHOTO RULE: the poster will feature the owner's ACTUAL product photo. kicker/headline/sub must COMPLEMENT the photo — add offer context, emotion — never describe or repeat what the photo already shows." : 'NO PHOTO: the poster is pure typography — the headline and sub carry the whole design.'}
 
-QUALITY BAR (this is what separates you from a cheap template):
-- Hooks must be SPECIFIC to this business, product, city or offer. If a hook could be pasted onto any shop's post, rewrite it.
-- Lead with the most concrete detail the owner gave you (price, dish, fabric, occasion, landmark, delivery promise) — specifics sell, adjectives don't.
-- If the owner's description is short, vague or garbled, still write confidently for the CATEGORY (e.g. a jewellery store gets craftsmanship/trust/occasion angles) — never invent facts (no fake discounts, no fake reviews), never ask questions back.
-- BANNED: "elevate your style", "unlock happiness", "dhamaka" unless the owner said it, "limited stock!!!", triple exclamation marks, more than 3 emojis per caption, wishing a festival the owner didn't ask for.
-- Vary sentence rhythm: short punch → one flowing line → clear CTA.
+QUALITY BAR — DESIGNED TO CONVERT & DRIVE REAL SALES:
+- The poster MUST look like a premium social media advertisement that drives real business results, conversions, leads, or footfall.
+- poster.headline: A high-converting, scroll-stopping English headline. Maximum 24 characters so it fits cleanly on the poster without overflowing. Must speak directly to the customer's aspiration or immediate benefit (e.g. 'Admissions Open 2026', 'Handcrafted Gold Sets', 'Fresh Bakes Daily'). NEVER duplicate the brand name inside the headline if the brand is already displayed.
+- poster.sub: A persuasive, clear English subtitle (max 65 chars) that provides the core value proposition, key advantage, or social proof.
+- poster.offer_text: A high-impact CTA button text or offer badge (e.g. 'Enroll Today', 'Book A Consultation', 'Flat 15% Off', 'Order On WhatsApp', 'Visit Campus').
+- poster.kicker: Category or campaign tag (e.g. 'LIMITED SEATS', 'NEW ADMISSIONS', 'FESTIVE COLLECTION', 'SPECIAL OFFER').
+- Hooks must be SPECIFIC to this business, product, city or offer. Lead with the most concrete detail the owner gave you (dates, courses, prices, dishes, fabric, occasion, delivery). Specifics sell; generic buzzwords fail.
+- BANNED: 'elevate your style', 'unlock happiness', 'dhamaka' unless asked, 'limited stock!!!', triple exclamation marks, more than 3 emojis per caption, wishing a festival the owner didn't ask for.
+- Vary sentence rhythm: short punch -> one flowing line -> clear conversion CTA.
 
 HARD RULES:
 1. Respond ONLY with valid JSON — no markdown, no code fences, no commentary.
@@ -140,10 +143,10 @@ Return EXACTLY this JSON structure (use the literal token [BREAK] instead of rea
     const poster = {
       palette,
       layout,
-      kicker: oneLine(p.kicker, 30),
-      headline: oneLine(p.headline, 28) || businessName.slice(0, 24),
-      sub: oneLine(p.sub, 90),
-      offer_text: oneLine(p.offer_text, 26),
+      kicker: oneLine(p.kicker, 26) || 'NEW',
+      headline: oneLine(p.headline, 24) || 'Special Announcement',
+      sub: oneLine(p.sub, 68),
+      offer_text: oneLine(p.offer_text, 22),
     };
 
     const hashtags: string[] = Array.isArray(raw.hashtags)
