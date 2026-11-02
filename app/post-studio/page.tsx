@@ -277,6 +277,18 @@ function PostStudioInner() {
       if (data.caption_b) data.caption_b = data.caption_b.replace(/\[BREAK\]/g, '\n');
       if (!data.poster) data.poster = { palette: 'diwaliMaroon', layout: 'modern', kicker: festival || 'New Post', headline: form.businessName, sub: form.offer || form.productDescription.slice(0, 60), offer_text: form.offer || '' };
       updateResult(data);
+      // Save to post history in localStorage
+      try {
+        const historyItem = {
+          id: Date.now().toString(),
+          businessName: form.businessName || 'My Business',
+          caption: data.caption,
+          createdAt: Date.now(),
+        };
+        const history = JSON.parse(localStorage.getItem('growmitra_post_history') || '[]');
+        history.unshift(historyItem);
+        localStorage.setItem('growmitra_post_history', JSON.stringify(history.slice(0, 20)));
+      } catch { /* localStorage unavailable */ }
       toast('Your post is ready! ✨', 'ai');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong — please try again in a moment.');

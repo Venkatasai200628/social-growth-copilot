@@ -24,7 +24,7 @@ import { Button, Card, LanguageSelect } from '@/app/components/ui';
 import { authFetch, whatsappLink, copyText } from '@/lib/client';
 import { speak, useSpeechRecognition } from '@/lib/use-speech';
 
-const TABS = ['Overview', 'Strategy', 'Content Calendar', 'Ad Packages', 'AI Coach', 'ROI Calculator', 'Update Metrics'];
+const TABS = ['Overview', 'Strategy', 'Calendar', 'Ad Packages', 'AI Coach', 'ROI Calculator', 'Update Metrics'];
 
 interface CoachData {
   headline: string;
@@ -307,9 +307,15 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
             <ArrowLeft size={14} /> My Campaigns
           </button>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_25%,transparent)] rounded-full px-4 py-1.5 text-xs text-[var(--success)]">
-              <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" /> Campaign Active
-            </div>
+            {((campaign as unknown as { status?: string }).status === 'completed' || order.status === 'completed') ? (
+              <div className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--text-muted)_10%,transparent)] border border-[color-mix(in_srgb,var(--text-muted)_25%,transparent)] rounded-full px-4 py-1.5 text-xs text-[var(--text-muted)]">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]" /> Campaign Completed
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_25%,transparent)] rounded-full px-4 py-1.5 text-xs text-[var(--success)]">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" /> Campaign Active
+              </div>
+            )}
             <button onClick={() => router.push(`/dashboard/${id}/share`)}
               className="flex items-center gap-1.5 text-xs bg-[var(--hover-fill)] border border-[var(--border)] rounded-xl px-3 py-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-all">
               <Share2 size={11} /> Share
@@ -350,7 +356,7 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
           {TABS.map((tab) => (
             <button key={tab} onClick={() => { setActiveTab(tab); if (tab === 'Ad Packages') loadAdPackages(); }}
               aria-pressed={activeTab === tab}
-              className={`flex-1 min-w-fit text-xs py-2.5 px-3 rounded-xl transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text)]'}`}>
+              className={`flex-shrink-0 min-w-max text-xs py-2.5 px-3 rounded-xl transition-all whitespace-nowrap ${activeTab === tab ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text)]'}`}>
               {tab}
             </button>
           ))}
@@ -448,11 +454,25 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
                 </table>
               </div>
             </div>
+
+            {/* Human Layer teaser */}
+            <div className="bg-[var(--card)] border border-[color-mix(in_srgb,var(--gold)_30%,transparent)] rounded-3xl p-6 flex items-start gap-5">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--gold) 25%, transparent)' }}>
+                <Users size={18} style={{ color: 'var(--gold)' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-sm font-semibold text-[var(--text)]">Need professional creative help?</h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'color-mix(in srgb, var(--gold) 15%, transparent)', color: 'var(--gold)', border: '1px solid color-mix(in srgb, var(--gold) 30%, transparent)' }}>Coming Soon</span>
+                </div>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">GrowMitra can connect you with photo editors, designers and video editors who understand your brief — coming soon.</p>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ── STRATEGY ── */}
-        {activeTab === 'Strategy' && (
+        {activeTab === 'Strategy' && hasStrategy && (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-display text-lg font-bold text-[var(--text)]">AI-Generated Strategy</h3>
@@ -466,7 +486,7 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
         )}
 
         {/* ── STRATEGY: building in background ── */}
-        {activeTab === 'Strategy' && strategyGenerating && (
+        {activeTab === 'Strategy' && strategyGenerating && !hasStrategy && (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-10 text-center">
             <div className="w-10 h-10 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <h3 className="font-display text-lg font-bold text-[var(--text)] mb-2">Your AI strategy is being written…</h3>
@@ -475,7 +495,7 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
         )}
 
         {/* ── STRATEGY: generation failed — offer retry ── */}
-        {activeTab === 'Strategy' && (campaign as { strategyStatus?: string }).strategyStatus === 'failed' && !campaign.strategy && (
+        {activeTab === 'Strategy' && (campaign as { strategyStatus?: string }).strategyStatus === 'failed' && !hasStrategy && !strategyGenerating && (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-10 text-center">
             <h3 className="font-display text-lg font-bold text-[var(--text)] mb-2">The strategy didn&apos;t generate</h3>
             <p className="text-[var(--text-muted)] text-sm max-w-md mx-auto mb-6">The AI call failed (usually a temporary network or service hiccup). Your campaign and tracking are fine — retry below.</p>
@@ -487,12 +507,12 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
         )}
 
         {/* ── CONTENT CALENDAR ── */}
-        {activeTab === 'Content Calendar' && !hasStrategy && (
+        {activeTab === 'Calendar' && !hasStrategy && (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-10 text-center text-[var(--text-muted)] text-sm">
             {strategyGenerating ? 'The calendar is part of your AI strategy — still building. This page updates itself when it lands.' : 'The calendar comes with your AI strategy. Open the Strategy tab to generate or retry it.'}
           </div>
         )}
-        {activeTab === 'Content Calendar' && hasStrategy && (
+        {activeTab === 'Calendar' && hasStrategy && (
           <div className="space-y-4">
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-8">
               <h3 className="font-display text-lg font-bold text-[var(--text)] mb-6 flex items-center gap-2"><Calendar size={16} className="text-[var(--accent-soft)]" />Full Content Calendar</h3>
@@ -532,6 +552,20 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Human Layer teaser */}
+            <div className="bg-[var(--card)] border border-[color-mix(in_srgb,var(--gold)_30%,transparent)] rounded-3xl p-6 flex items-start gap-5">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'color-mix(in srgb, var(--gold) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--gold) 25%, transparent)' }}>
+                <Users size={18} style={{ color: 'var(--gold)' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="text-sm font-semibold text-[var(--text)]">Need professional creative help?</h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'color-mix(in srgb, var(--gold) 15%, transparent)', color: 'var(--gold)', border: '1px solid color-mix(in srgb, var(--gold) 30%, transparent)' }}>Coming Soon</span>
+                </div>
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">GrowMitra can connect you with photo editors, designers and video editors who understand your brief — coming soon.</p>
+              </div>
             </div>
           </div>
         )}
@@ -687,6 +721,11 @@ function DashboardPageInner({ params }: { params: Promise<{ id: string }> }) {
                         <div className="text-xl font-display font-bold" style={{ color }}>{value}</div>
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-5 space-y-2 text-xs text-[var(--text-muted)] leading-relaxed">
+                    <p><span className="font-semibold text-[var(--text-soft)]">CPM</span> = cost to reach 1,000 people. The lower, the better.</p>
+                    <p><span className="font-semibold text-[var(--text-soft)]">CPC</span> = how much each click costs you. Good benchmark: ₹2–15 for Indian SMBs.</p>
+                    <p><span className="font-semibold text-[var(--text-soft)]">CTR</span> = clicks ÷ reach. Anything above 2% is strong for organic posts.</p>
                   </div>
                 </>
               )}

@@ -44,7 +44,7 @@ function WelcomeInner() {
     } catch {
       localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify({ businessName, category, primaryGoal: selectedGoal, onboarded: true }));
     }
-    router.replace('/my-campaigns');
+    router.replace('/home');
   };
 
   const StepIcon = ({ icon: Icon, color = 'var(--accent-soft)' }: { icon: typeof Zap; color?: string }) => (

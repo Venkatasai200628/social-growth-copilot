@@ -264,3 +264,26 @@ code { font-family: ui-monospace, monospace; }
 [data-theme="light"] .text-white[class*="linear-gradient"],
 [data-theme="light"] .text-white[style*="linear-gradient"] { color: var(--accent-contrast) !important; }
 [data-theme="light"] .hover\:text-white:hover { color: var(--text) !important; }
+
+/* ── Additional animations for landing page ────────────────────── */
+@keyframes slideInLeft { 0%{opacity:0;transform:translateX(-24px)} 100%{opacity:1;transform:translateX(0)} }
+.animate-slide-left { animation: slideInLeft 0.5s ease-out both; }
+
+@keyframes slideInRight { 0%{opacity:0;transform:translateX(24px)} 100%{opacity:1;transform:translateX(0)} }
+.animate-slide-right { animation: slideInRight 0.5s ease-out both; }
+
+@keyframes pulse-slow { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+
+@keyframes typing { 0%,100%{width:0} 50%{width:100%} }
+
+/* gradient border utility */
+.border-gradient {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+}
+
+/* Live green dot pulse */
+@keyframes ping-small { 0%{transform:scale(1);opacity:1} 100%{transform:scale(1.8);opacity:0} }
+.animate-ping-small { animation: ping-small 1.5s ease-out infinite; }

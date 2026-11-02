@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Zap, ImageIcon, Film, MessageCircle, TrendingUp, Edit3, Calendar,
-  ArrowRight, Plus, Sparkles, HelpCircle,
+  ArrowRight, Plus, Sparkles, HelpCircle, Star, Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '../components/AuthGuard';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { Eyebrow, Card, Button } from '../components/ui';
+import { upcomingFestivals } from '@/lib/india';
 
 interface RecentCampaign {
   id: string;
@@ -19,6 +20,13 @@ interface RecentCampaign {
   duration: number;
   strategyStatus?: string;
   loggedDays?: number;
+}
+
+interface PostHistoryItem {
+  id: string;
+  businessName: string;
+  caption: string;
+  createdAt: number;
 }
 
 function greetingIST(): string {
@@ -37,11 +45,38 @@ function daysSince(ts: number): string {
   return `${d} days ago`;
 }
 
+function timeAgo(ts: number): string {
+  const diffMs = Date.now() - ts;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return daysSince(ts);
+}
+
 function HomeInner() {
   const router = useRouter();
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<RecentCampaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [postHistory, setPostHistory] = useState<PostHistoryItem[]>([]);
+  const [festivalStrip, setFestivalStrip] = useState<{ name: string; daysUntil: number; id: string } | null>(null);
+
+  useEffect(() => {
+    // Load post history from localStorage
+    try {
+      const raw = localStorage.getItem('growmitra_post_history');
+      if (raw) setPostHistory(JSON.parse(raw).slice(0, 3));
+    } catch { /* ignore */ }
+
+    // Compute festival strip
+    const upcoming = upcomingFestivals(new Date(), 14);
+    if (upcoming.length > 0) {
+      const f = upcoming[0];
+      setFestivalStrip({ name: f.name, daysUntil: f.daysUntil, id: f.id });
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -110,6 +145,12 @@ function HomeInner() {
     { href: '/reply-agent', icon: MessageCircle, label: 'Reply Assistant', desc: 'Paste a customer DM, get English replies', color: '#25d366' },
   ];
 
+  const toolCards = [
+    { href: '/scorer', icon: Star, label: 'Caption Scorer', desc: 'A/B test two hooks — find what stops the scroll', color: 'var(--gold)' },
+    { href: '/festivals', icon: Calendar, label: 'Festival Calendar', desc: '18+ Indian festivals with dates and poster moods', color: 'var(--neon)' },
+    { href: '/strategy', icon: Trophy, label: 'Strategy Generator', desc: 'Get a multi-day content strategy tailored to your business', color: 'var(--accent-soft)' },
+  ];
+
   return (
     <main className="min-h-screen relative overflow-hidden">
       <div className="orb w-[600px] h-[600px] bg-[color-mix(in_srgb,var(--accent)_9%,transparent)] top-[-180px] right-[-140px]" />
@@ -124,14 +165,35 @@ function HomeInner() {
           <p className="text-[var(--text-muted)] mt-3 text-sm">What are we growing today?</p>
         </div>
 
+        {/* Festival Strip */}
+        {festivalStrip && (
+          <div className="mt-8 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--gold) 15%, transparent), color-mix(in srgb, var(--gold) 8%, transparent))', border: '1px solid color-mix(in srgb, var(--gold) 30%, transparent)' }}>
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🎉</span>
+              <div>
+                <span className="text-sm font-semibold text-[var(--text)]">{festivalStrip.name}</span>
+                <span className="text-xs text-[var(--text-muted)] ml-2">
+                  {festivalStrip.daysUntil <= 0 ? 'is today!' : festivalStrip.daysUntil === 1 ? 'is tomorrow!' : `is in ${festivalStrip.daysUntil} days`}
+                </span>
+              </div>
+            </div>
+            <button onClick={() => router.push(`/post-studio?festival=${festivalStrip.id}`)}
+              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-full font-medium transition-all"
+              style={{ background: 'color-mix(in srgb, var(--gold) 20%, transparent)', color: 'var(--gold)', border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)' }}>
+              Make your {festivalStrip.name.split(' ')[0]} post <ArrowRight size={12} />
+            </button>
+          </div>
+        )}
+
         {/* Quick actions */}
         <div className="grid sm:grid-cols-2 gap-4 mt-10">
           {quickActions.map(({ href, icon: Icon, label, desc, color }) => (
             <button key={href} onClick={() => router.push(href)}
-              className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-0.5 transition-all">
+              className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-0.5 hover:scale-[1.02] transition-all">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4"
                 style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
-                <Icon size={18} style={{ color }} />
+                <Icon size={22} style={{ color }} />
               </div>
               <div className="font-display text-base font-bold text-[var(--text)] mb-1 flex items-center gap-2">
                 {label} <ArrowRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--accent-soft)]" />
@@ -178,6 +240,49 @@ function HomeInner() {
           )}
         </div>
 
+        {/* Recent posts */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest">Recent posts</h2>
+              <p className="text-[10px] text-[var(--text-faint)] mt-0.5">Posts you created in Post Studio</p>
+            </div>
+            {postHistory.length > 0 && (
+              <button onClick={() => router.push('/post-studio')}
+                className="text-xs text-[var(--accent-soft)] hover:underline inline-flex items-center gap-1">
+                New post <ArrowRight size={11} />
+              </button>
+            )}
+          </div>
+          {postHistory.length === 0 ? (
+            <Card className="p-7 text-center">
+              <div className="w-10 h-10 rounded-2xl bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] flex items-center justify-center mx-auto mb-3">
+                <ImageIcon size={16} className="text-[var(--accent-soft)]" />
+              </div>
+              <p className="text-[var(--text-muted)] text-sm mb-4">No posts created yet — your Post Studio history appears here.</p>
+              <Button onClick={() => router.push('/post-studio')} variant="ghost" size="sm"><Zap size={13} /> Create your first post</Button>
+            </Card>
+          ) : (
+            <div className="space-y-2.5">
+              {postHistory.map((p) => (
+                <button key={p.id} onClick={() => router.push('/post-studio')}
+                  className="w-full text-left bg-[var(--card)] border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-[color-mix(in_srgb,var(--accent)_40%,transparent)] transition-all flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-[color-mix(in_srgb,var(--accent-soft)_12%,transparent)] border border-[color-mix(in_srgb,var(--accent-soft)_25%,transparent)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <ImageIcon size={13} className="text-[var(--accent-soft)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-[var(--text)] truncate">{p.businessName}</span>
+                      <span className="text-[10px] text-[var(--text-faint)] flex-shrink-0">{timeAgo(p.createdAt)}</span>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">{p.caption}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Today's checklist — only real, derivable actions */}
         <div className="mt-12">
           <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-4">Today&apos;s shortlist</h2>
@@ -206,6 +311,24 @@ function HomeInner() {
               </div>
               <ArrowRight size={14} className="text-[var(--text-faint)] flex-shrink-0" />
             </button>
+          </div>
+        </div>
+
+        {/* Tools */}
+        <div className="mt-12">
+          <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest mb-4">Tools</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {toolCards.map(({ href, icon: Icon, label, desc, color }) => (
+              <button key={href} onClick={() => router.push(href)}
+                className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-0.5 hover:scale-[1.02] transition-all">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
+                  style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
+                  <Icon size={16} style={{ color }} />
+                </div>
+                <div className="font-display text-sm font-bold text-[var(--text)] mb-1">{label}</div>
+                <p className="text-[var(--text-muted)] text-xs leading-relaxed">{desc}</p>
+              </button>
+            ))}
           </div>
         </div>
 

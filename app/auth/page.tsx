@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, TrendingUp, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Leaf, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
 type Mode = 'signin' | 'signup' | 'reset';
@@ -80,8 +80,10 @@ export default function AuthPage() {
 
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/25 flex items-center justify-center mx-auto mb-5">
-            <TrendingUp size={20} className="text-[var(--accent-soft)]" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 p-[2px] mx-auto mb-5">
+            <div className="w-full h-full rounded-[10px] bg-[var(--card)] flex items-center justify-center">
+              <Leaf size={22} className="text-emerald-400" />
+            </div>
           </div>
           <h1 className="font-display text-4xl font-bold text-[var(--text)] mb-2 leading-tight">
             {mode === 'signin' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
