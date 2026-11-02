@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Film, ChevronDown, Sparkles, AlertCircle, RefreshCw, Download, Clock, Music, Camera,
-  Fish, Target, Mic, PenLine, Image as ImageIcon, Clapperboard, Scissors, Megaphone } from 'lucide-react';
+  Fish, Target, Mic, PenLine, Image as ImageIcon, Clapperboard, Scissors, Megaphone,
+  Edit3, Check, Palette, Layers } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card, Field, inputCls, CopyButton, Skeleton, Tabs, PageHeader, EmptyState } from '../components/ui';
 import { authFetch } from '@/lib/client';
-import { renderPromoVideo, downloadVideo, RenderResult } from '@/lib/video';
+import { renderPromoVideo, downloadVideo, RenderResult, VIDEO_THEMES, VIDEO_TRANSITIONS, TransitionType } from '@/lib/video';
 import PhotoPicker from './PhotoPicker';
 import { CATEGORIES } from '@/lib/types';
 
@@ -73,6 +74,29 @@ function VideoStudioInner() {
   // AI voiceover options for the promo video
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
+  // Visual theme & scene transitions
+  const [selectedTheme, setSelectedTheme] = useState<string>('royalGold');
+  const [selectedTransition, setSelectedTransition] = useState<TransitionType>('crossfade');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingHook, setEditingHook] = useState(false);
+  const [editingSceneIdx, setEditingSceneIdx] = useState<number | null>(null);
+
+  const updateScene = (idx: number, patch: Partial<Scene>) => {
+    if (!result) return;
+    const updatedScenes = [...result.scenes];
+    updatedScenes[idx] = { ...updatedScenes[idx], ...patch };
+    updateResult({ ...result, scenes: updatedScenes });
+  };
+
+  const updateTitle = (val: string) => {
+    if (!result) return;
+    updateResult({ ...result, title: val });
+  };
+
+  const updateHook = (val: string) => {
+    if (!result) return;
+    updateResult({ ...result, hook_line: val });
+  };
 
   // Build a real promo video from the generated scenes: AI stills from our
   // /api/scene-image route animated with Ken-Burns + text overlays, recorded
@@ -101,6 +125,8 @@ function VideoStudioInner() {
           photos: sceneList.map((_, i) => photos[i] ?? null),
           businessName: form.businessName || 'Your Business',
           cta: form.goal === 'Drive Sales' ? 'Order Now' : 'Follow for more',
+          paletteId: selectedTheme,
+          transition: selectedTransition,
           secondsPerScene: 2.6,
           voiceover: voiceOn
             ? {
@@ -290,8 +316,31 @@ function VideoStudioInner() {
                 {/* Title + actions */}
                 <Card className="p-6">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="min-w-0">
-                      <h2 className="font-display text-xl font-bold text-[var(--text)] mb-1">{result.title}</h2>
+                    <div className="min-w-0 flex-1">
+                      {editingTitle ? (
+                        <div className="flex items-center gap-2 mb-1">
+                          <input
+                            type="text"
+                            value={result.title}
+                            onChange={(e) => updateTitle(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') setEditingTitle(false); }}
+                            className="bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-3 py-1.5 text-base font-bold text-[var(--text)] focus:border-[var(--accent)] outline-none flex-1"
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={() => setEditingTitle(false)}><Check size={12} /> Save</Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 mb-1">
+                          <h2 className="font-display text-xl font-bold text-[var(--text)]">{result.title}</h2>
+                          <button
+                            onClick={() => setEditingTitle(true)}
+                            className="opacity-60 hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--text)] transition-opacity"
+                            title="Edit video title"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] flex-wrap">
                         <span className="flex items-center gap-1"><Clock size={10} />{form.duration}s · {form.platform}</span>
                         <span className="flex items-center gap-1"><Target size={10} />{form.goal}</span>
@@ -306,8 +355,25 @@ function VideoStudioInner() {
 
                   {/* Hook callout */}
                   <div className="mt-5 bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] rounded-2xl p-4">
-                    <div className="text-xs text-[var(--accent-soft)] uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Fish size={11} /> Opening Hook</div>
-                    <p className="text-[var(--text)] text-sm leading-relaxed italic">&ldquo;{result.hook_line}&rdquo;</p>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="text-xs text-[var(--accent-soft)] uppercase tracking-widest flex items-center gap-1.5"><Fish size={11} /> Opening Hook</div>
+                      <button
+                        onClick={() => setEditingHook(!editingHook)}
+                        className="text-xs text-[var(--accent-soft)] hover:underline flex items-center gap-1"
+                      >
+                        {editingHook ? <><Check size={11} /> Done</> : <><Edit3 size={11} /> Edit hook</>}
+                      </button>
+                    </div>
+                    {editingHook ? (
+                      <textarea
+                        value={result.hook_line}
+                        onChange={(e) => updateHook(e.target.value)}
+                        rows={2}
+                        className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl p-2.5 text-sm text-[var(--text)] focus:border-[var(--accent)] outline-none"
+                      />
+                    ) : (
+                      <p className="text-[var(--text)] text-sm leading-relaxed italic">&ldquo;{result.hook_line}&rdquo;</p>
+                    )}
                   </div>
 
                   {/* Promo video maker */}
@@ -322,31 +388,74 @@ function VideoStudioInner() {
                       </Button>
                     </div>
 
-                    {/* Voice options */}
-                    <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
-                      <label className="flex items-center gap-2 text-xs text-[var(--text-soft)] cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={voiceOn}
-                          onChange={(e) => setVoiceOn(e.target.checked)}
-                          className="w-3.5 h-3.5 accent-[var(--neon)] cursor-pointer"
-                        />
-                        <Mic size={12} /> AI voiceover
-                      </label>
-                      {voiceOn && (
-                        <div className="relative">
+                    {/* Controls grid: Voice, Theme, Transition */}
+                    <div className="mt-4 pt-3 border-t border-[var(--border)] grid sm:grid-cols-3 gap-3">
+                      {/* Voice options */}
+                      <div className="space-y-1">
+                        <label className="flex items-center gap-2 text-xs text-[var(--text-soft)] cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={voiceOn}
+                            onChange={(e) => setVoiceOn(e.target.checked)}
+                            className="w-3.5 h-3.5 accent-[var(--neon)] cursor-pointer"
+                          />
+                          <Mic size={12} /> AI voiceover
+                        </label>
+                        {voiceOn && (
+                          <div className="relative mt-1">
+                            <select
+                              aria-label="Voice"
+                              className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                              value={voiceGender}
+                              onChange={(e) => setVoiceGender(e.target.value as 'female' | 'male')}
+                            >
+                              <option value="female">Female voice</option>
+                              <option value="male">Male voice</option>
+                            </select>
+                            <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Theme / Palette */}
+                      <div className="space-y-1">
+                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5">
+                          <Palette size={12} className="text-[var(--gold)]" /> Design Theme
+                        </label>
+                        <div className="relative mt-1">
                           <select
-                            aria-label="Voice"
-                            className="appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-full pl-4 pr-8 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                            value={voiceGender}
-                            onChange={(e) => setVoiceGender(e.target.value as 'female' | 'male')}
+                            aria-label="Design Theme"
+                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                            value={selectedTheme}
+                            onChange={(e) => setSelectedTheme(e.target.value)}
                           >
-                            <option value="female">Female voice</option>
-                            <option value="male">Male voice</option>
+                            {VIDEO_THEMES.map((theme) => (
+                              <option key={theme.id} value={theme.id}>{theme.name}</option>
+                            ))}
                           </select>
-                          <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
                         </div>
-                      )}
+                      </div>
+
+                      {/* Scene Transitions */}
+                      <div className="space-y-1">
+                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5">
+                          <Layers size={12} className="text-[var(--accent-soft)]" /> Transitions
+                        </label>
+                        <div className="relative mt-1">
+                          <select
+                            aria-label="Scene Transition"
+                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                            value={selectedTransition}
+                            onChange={(e) => setSelectedTransition(e.target.value as TransitionType)}
+                          >
+                            {VIDEO_TRANSITIONS.map((tr) => (
+                              <option key={tr.id} value={tr.id}>{tr.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                        </div>
+                      </div>
                     </div>
                     {videoBusy && (
                       <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden mt-3">
@@ -395,35 +504,114 @@ function VideoStudioInner() {
                     {/* Scenes tab */}
                     {activeTab === 'scenes' && (
                       <div id="video-tab-scenes" role="tabpanel" className="space-y-4">
-                        {result.scenes.map((scene) => (
-                          <div key={scene.scene_number} className="bg-[var(--bg-alt)] border border-[var(--border)] rounded-2xl p-5">
-                            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-                              <div className="flex items-center gap-2.5">
-                                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent-soft)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
-                                  Scene {scene.scene_number}
-                                </span>
-                                <span className="text-xs text-[var(--text-muted)]">{scene.duration_seconds}s · {scene.shot_type}</span>
+                        <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-muted)] pb-1 flex-wrap">
+                          <span>{result.scenes.length} Scenes in Storyboard</span>
+                          <span className="text-[var(--accent-soft)]">Click &ldquo;Edit Scene&rdquo; on any scene to customize titles, visual cues & voiceover</span>
+                        </div>
+                        {result.scenes.map((scene, idx) => {
+                          const isEditing = editingSceneIdx === idx;
+                          return (
+                            <div key={scene.scene_number} className="bg-[var(--bg-alt)] border border-[var(--border)] rounded-2xl p-5 transition-all">
+                              <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent-soft)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
+                                    Scene {scene.scene_number}
+                                  </span>
+                                  <span className="text-xs text-[var(--text-muted)]">{scene.duration_seconds}s · {scene.shot_type}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-[var(--text-faint)] italic hidden sm:inline">{scene.music_mood}</span>
+                                  <button
+                                    onClick={() => setEditingSceneIdx(isEditing ? null : idx)}
+                                    className="flex items-center gap-1.5 text-xs text-[var(--accent-soft)] hover:underline font-medium px-2.5 py-1 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] transition-all"
+                                  >
+                                    {isEditing ? <><Check size={11} /> Done</> : <><Edit3 size={11} /> Edit Scene</>}
+                                  </button>
+                                </div>
                               </div>
-                              <span className="text-xs text-[var(--text-faint)] italic">{scene.music_mood}</span>
-                            </div>
-                            <div className="space-y-2.5">
-                              <div>
-                                <span className="text-xs text-[var(--text-faint)] uppercase tracking-widest flex items-center gap-1"><Camera size={10}/> Visual</span>
-                                <p className="text-sm text-[var(--text-soft)] mt-1 leading-relaxed">{scene.visual}</p>
-                              </div>
-                              <div>
-                                <span className="text-xs text-[var(--text-faint)] uppercase tracking-widest flex items-center gap-1"><Mic size={10}/> Voiceover</span>
-                                <p className="text-sm text-[var(--accent-soft)] mt-1 italic">&ldquo;{scene.voiceover}&rdquo;</p>
-                              </div>
-                              {scene.text_overlay && (
-                                <div>
-                                  <span className="text-xs text-[var(--text-faint)] uppercase tracking-widest flex items-center gap-1"><PenLine size={10}/> Text Overlay</span>
-                                  <p className="text-sm text-[var(--gold)] mt-1">{scene.text_overlay}</p>
+
+                              {isEditing ? (
+                                <div className="space-y-3 pt-2">
+                                  <div>
+                                    <label className="text-[11px] font-medium text-[var(--gold)] uppercase tracking-wider flex items-center gap-1 mb-1">
+                                      <PenLine size={10} /> Title / On-Screen Text Overlay
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={scene.text_overlay || ''}
+                                      onChange={(e) => updateScene(idx, { text_overlay: e.target.value })}
+                                      className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none"
+                                      placeholder="Main caption displayed on screen"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-medium text-[var(--accent-soft)] uppercase tracking-wider flex items-center gap-1 mb-1">
+                                      <Mic size={10} /> Spoken Voiceover Narration
+                                    </label>
+                                    <textarea
+                                      value={scene.voiceover}
+                                      onChange={(e) => updateScene(idx, { voiceover: e.target.value })}
+                                      rows={2}
+                                      className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl p-2.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none"
+                                      placeholder="What the narrator says in this scene"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider flex items-center gap-1 mb-1">
+                                      <Camera size={10} /> Visual Cue / Image Prompt
+                                    </label>
+                                    <textarea
+                                      value={scene.visual}
+                                      onChange={(e) => updateScene(idx, { visual: e.target.value })}
+                                      rows={2}
+                                      className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl p-2.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none"
+                                      placeholder="Scene imagery or product shot direction"
+                                    />
+                                  </div>
+                                  <div className="flex gap-3">
+                                    <div className="flex-1">
+                                      <label className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider block mb-1">Shot Type</label>
+                                      <input
+                                        type="text"
+                                        value={scene.shot_type}
+                                        onChange={(e) => updateScene(idx, { shot_type: e.target.value })}
+                                        className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-3 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none"
+                                      />
+                                    </div>
+                                    <div className="w-28">
+                                      <label className="text-[11px] font-medium text-[var(--text-faint)] uppercase tracking-wider block mb-1">Duration (s)</label>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={15}
+                                        value={scene.duration_seconds}
+                                        onChange={(e) => updateScene(idx, { duration_seconds: Number(e.target.value) || 3 })}
+                                        className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-3 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-2.5">
+                                  <div>
+                                    <span className="text-xs text-[var(--text-faint)] uppercase tracking-widest flex items-center gap-1"><Camera size={10}/> Visual</span>
+                                    <p className="text-sm text-[var(--text-soft)] mt-1 leading-relaxed">{scene.visual}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-[var(--text-faint)] uppercase tracking-widest flex items-center gap-1"><Mic size={10}/> Voiceover</span>
+                                    <p className="text-sm text-[var(--accent-soft)] mt-1 italic">&ldquo;{scene.voiceover}&rdquo;</p>
+                                  </div>
+                                  {scene.text_overlay && (
+                                    <div>
+                                      <span className="text-xs text-[var(--text-faint)] uppercase tracking-widest flex items-center gap-1"><PenLine size={10}/> Text Overlay</span>
+                                      <p className="text-sm text-[var(--gold)] mt-1">{scene.text_overlay}</p>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
 

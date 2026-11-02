@@ -97,6 +97,12 @@ function PhoneMockup() {
       <div className="absolute bottom-8 -left-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl px-3 py-2 text-xs shadow-xl flex items-center gap-1.5">
         <Mic size={11} className="text-[var(--accent-soft)]" /> Voice input
       </div>
+      <div className="absolute -top-4 -left-4 hidden sm:flex items-center gap-1.5 bg-[var(--card)] border border-[#25d366]/30 text-[#25d366] rounded-2xl px-3 py-1.5 text-xs shadow-xl animate-float" style={{ animationDelay: '0.6s' }}>
+        <div className="w-1.5 h-1.5 rounded-full bg-[#25d366]" /> WhatsApp Flow
+      </div>
+      <div className="absolute -bottom-3 -right-2 hidden sm:flex items-center gap-1.5 bg-[var(--card)] border border-[#e1306c]/30 text-[#e1306c] rounded-2xl px-3 py-1.5 text-xs shadow-xl animate-float" style={{ animationDelay: '1.2s' }}>
+        <div className="w-1.5 h-1.5 rounded-full bg-[#e1306c]" /> Instagram Ready
+      </div>
     </div>
   );
 }
@@ -106,16 +112,6 @@ function StepConnector() {
   return (
     <div className="hidden md:block absolute top-8 left-0 right-0 h-px z-0"
       style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent) 30%, transparent), transparent)' }} />
-  );
-}
-
-function FloatingPill({ label, color, style }: { label: string; color: string; style: React.CSSProperties }) {
-  return (
-    <div className="absolute hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border backdrop-blur-xl animate-float"
-      style={{ background: `${color}12`, borderColor: `${color}25`, color, ...style }}>
-      <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-      {label}
-    </div>
   );
 }
 
@@ -185,9 +181,6 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-full px-5 py-2 text-xs text-[var(--accent-soft)] mb-6 tracking-widest uppercase">
               <Sparkles size={11} /> Your AI marketing mitra
             </div>
-
-            <FloatingPill label="Instagram" color="#e1306c" style={{ top: '15%', left: '-8%', animationDelay: '0s' }} />
-            <FloatingPill label="WhatsApp" color="#25d366" style={{ top: '32%', left: '-10%', animationDelay: '0.5s' }} />
 
             <h1 className="font-display text-5xl md:text-6xl font-bold mb-6 leading-tight tracking-tight">
               <span className="text-[var(--text)]">One photo.</span>{' '}
@@ -273,7 +266,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FEATURES ── */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 py-24">
+      <section id="features" className="relative z-10 max-w-6xl mx-auto px-6 py-24">
         <div className="text-center mb-14">
           <h2 className="font-display text-4xl font-bold text-[var(--text)] mb-3">Everything you need to grow</h2>
           <p className="text-[var(--text-muted)] text-sm">Seven tools. One mitra. Zero design skills needed.</p>
@@ -306,7 +299,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── HUMAN EXPERT LAYER ── */}
-      <section className="relative z-10 border-y border-[var(--border)] bg-[var(--card)]/40">
+      <section id="experts" className="relative z-10 border-y border-[var(--border)] bg-[var(--card)]/40">
         <div className="max-w-6xl mx-auto px-6 py-20">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full text-xs font-medium"
@@ -405,7 +398,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── SOCIAL PROOF ── */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 py-24">
+      <section id="testimonials" className="relative z-10 max-w-6xl mx-auto px-6 py-24">
         <div className="text-center mb-12">
           <h2 className="font-display text-4xl font-bold text-[var(--text)] mb-3">What shop owners say</h2>
         </div>

@@ -33,6 +33,33 @@ export interface VoiceoverSpec {
   voice?: 'female' | 'male';
 }
 
+export type TransitionType = 'crossfade' | 'slide' | 'zoom' | 'fadeBlack';
+
+export interface VideoTheme {
+  id: string;
+  name: string;
+  description: string;
+  accent: string;
+  bg1: string;
+  bg2: string;
+}
+
+export const VIDEO_THEMES: VideoTheme[] = [
+  { id: 'royalGold', name: 'Royal Gold', description: 'Luxury, Jewellery & Festive', accent: '#d4af37', bg1: '#141414', bg2: '#000000' },
+  { id: 'diwaliMaroon', name: 'Diwali Special', description: 'Festive Maroon & Golden Spark', accent: '#f5c04a', bg1: '#2b0a0a', bg2: '#120303' },
+  { id: 'tealLuxe', name: 'Luxe Teal', description: 'Modern, Fresh & High-End', accent: '#2dd4bf', bg1: '#042f2b', bg2: '#01100e' },
+  { id: 'kitchenSpice', name: 'Spice Orange', description: 'Vibrant for Cloud Kitchens & Food', accent: '#ff6b35', bg1: '#2a0f0a', bg2: '#120604' },
+  { id: 'boutiqueRose', name: 'Boutique Rose', description: 'Chic Apparel & Aesthetics', accent: '#f4a6c0', bg1: '#3d1c3a', bg2: '#160a16' },
+  { id: 'bakeryWarm', name: 'Warm Bakery', description: 'Cozy Artisanal & Sweets', accent: '#ffb347', bg1: '#4a2c2a', bg2: '#1e0f0e' },
+];
+
+export const VIDEO_TRANSITIONS: { id: TransitionType; name: string; desc: string }[] = [
+  { id: 'crossfade', name: 'Smooth Crossfade', desc: 'Cinematic blend between scenes' },
+  { id: 'slide', name: 'Dynamic Slide', desc: 'Modern social reel slide wipe' },
+  { id: 'zoom', name: 'Zoom Dissolve', desc: 'Punchy camera punch-in effect' },
+  { id: 'fadeBlack', name: 'Fade Through Black', desc: 'Dramatic blackout between scenes' },
+];
+
 export interface VideoSpec {
   scenes: VideoScene[];
   businessName: string;
@@ -49,6 +76,8 @@ export interface VideoSpec {
   photos?: (string | null)[];
   /** AI voiceover narration; null/omitted renders a silent video. */
   voiceover?: VoiceoverSpec | null;
+  /** Scene transition style */
+  transition?: TransitionType;
 }
 
 export interface RenderResult {
@@ -338,20 +367,16 @@ export async function renderPromoVideo(
     rec.start(250);
 
     const start = performance.now();
-    const frame = () => {
-      const t = performance.now() - start;
-      onProgress?.(Math.min(1, t / totalMs));
-      const idx = Math.min(Math.floor(t / (sps * 1000)), totalScenes - 1);
-      const local = (t - idx * sps * 1000) / (sps * 1000); // 0..1 within scene
+    const transType = spec.transition ?? 'crossfade';
+    const transFrac = 0.16; // ~0.4s smooth transition window at scene boundary
 
-      bgFill(t / 1000);
-
-      if (idx < spec.scenes.length) {
-        const img = images[idx];
+    const drawSceneLayer = (sceneIdx: number, localProgress: number, timeVal: number) => {
+      if (sceneIdx < spec.scenes.length) {
+        const img = images[sceneIdx];
         if (img) {
           // Ken-Burns: slow zoom in, slight drift
-          const zoom = 1.05 + 0.12 * local;
-          const dy = -30 * local;
+          const zoom = 1.05 + 0.12 * localProgress;
+          const dy = -30 * localProgress;
           drawCover(ctx, img, 1, zoom, dy);
         } else {
           // gradient scene: big centered scene number motif
@@ -359,15 +384,15 @@ export async function renderPromoVideo(
           ctx.globalAlpha = 0.12;
           ctx.fillStyle = p.accent;
           ctx.beginPath();
-          ctx.arc(W / 2, H * 0.42, 300 + 60 * Math.sin(t / 600), 0, 7);
+          ctx.arc(W / 2, H * 0.42, 300 + 60 * Math.sin(timeVal / 600), 0, 7);
           ctx.fill();
           ctx.restore();
         }
-        drawSceneText(ctx, p, spec.scenes[idx].title, spec.scenes[idx].subtitle, local);
+        drawSceneText(ctx, p, spec.scenes[sceneIdx].title, spec.scenes[sceneIdx].subtitle, localProgress);
       } else {
         // ── final CTA card ──
         ctx.save();
-        ctx.globalAlpha = Math.min(1, local * 2);
+        ctx.globalAlpha = Math.min(1, localProgress * 2);
         let size = 120;
         ctx.font = `900 ${size}px ${DISPLAY}`;
         const cta = spec.cta.toUpperCase();
@@ -385,6 +410,75 @@ export async function renderPromoVideo(
         ctx.fillStyle = 'rgba(255,255,255,0.6)';
         ctx.fillText('made with GrowMitra', W / 2, H * 0.42 + size + 140);
         ctx.restore();
+      }
+    };
+
+    const frame = () => {
+      const t = performance.now() - start;
+      onProgress?.(Math.min(1, t / totalMs));
+      const idx = Math.min(Math.floor(t / (sps * 1000)), totalScenes - 1);
+      const local = (t - idx * sps * 1000) / (sps * 1000); // 0..1 within scene
+
+      bgFill(t / 1000);
+
+      // Smooth transition handling between scenes
+      if (idx > 0 && local < transFrac) {
+        const rawP = local / transFrac;
+        // Smooth cubic ease-in-out
+        const ease = rawP * rawP * (3 - 2 * rawP);
+
+        if (transType === 'slide') {
+          // Dynamic slide: previous slides left, current slides in from right
+          ctx.save();
+          ctx.translate(-W * ease, 0);
+          drawSceneLayer(idx - 1, 1, t);
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(W * (1 - ease), 0);
+          drawSceneLayer(idx, local, t);
+          ctx.restore();
+        } else if (transType === 'zoom') {
+          // Zoom dissolve: previous scales up and fades, current dissolves in
+          ctx.save();
+          ctx.globalAlpha = 1 - ease;
+          ctx.translate(W / 2, H / 2);
+          ctx.scale(1 + 0.25 * ease, 1 + 0.25 * ease);
+          ctx.translate(-W / 2, -H / 2);
+          drawSceneLayer(idx - 1, 1, t);
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalAlpha = ease;
+          drawSceneLayer(idx, local, t);
+          ctx.restore();
+        } else if (transType === 'fadeBlack') {
+          // Fade through black
+          if (ease < 0.5) {
+            ctx.save();
+            ctx.globalAlpha = 1 - ease * 2;
+            drawSceneLayer(idx - 1, 1, t);
+            ctx.restore();
+          } else {
+            ctx.save();
+            ctx.globalAlpha = (ease - 0.5) * 2;
+            drawSceneLayer(idx, local, t);
+            ctx.restore();
+          }
+        } else {
+          // Default: Smooth Crossfade
+          ctx.save();
+          drawSceneLayer(idx - 1, 1, t);
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalAlpha = ease;
+          drawSceneLayer(idx, local, t);
+          ctx.restore();
+        }
+      } else {
+        // Direct scene playback
+        drawSceneLayer(idx, local, t);
       }
 
       if (t < totalMs) {
