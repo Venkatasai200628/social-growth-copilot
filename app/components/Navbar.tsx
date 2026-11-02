@@ -11,7 +11,7 @@ import { useTheme } from './ThemeProvider';
 // Internal studio tools grouped inside the Tools dropdown
 const studioTools = [
   { href: '/post-studio', label: 'Post Studio', desc: 'AI festival posters, 1:1, 4:5 & 9:16', icon: ImageIcon, color: 'var(--accent-soft)' },
-  { href: '/video-studio', label: 'Video Studio', desc: 'DistilBook motion explainers & promo reels', icon: Film, color: 'var(--neon)' },
+  { href: '/video-studio', label: 'Video Studio', desc: 'Motion explainers, promo reels & AI voiceovers', icon: Film, color: 'var(--neon)' },
   { href: '/campaign', label: 'Campaign Generator', desc: 'Multi-day plan with budget split', icon: Zap, color: 'var(--gold)' },
   { href: '/festivals', label: 'Festival Calendar', desc: '18+ Indian shopping festivals', icon: Calendar, color: '#f59e0b' },
   { href: '/scorer', label: 'Virality Scorer', desc: 'A/B test hooks & captions head-to-head', icon: Star, color: '#eab308' },

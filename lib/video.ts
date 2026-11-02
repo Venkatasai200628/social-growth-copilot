@@ -38,9 +38,9 @@ export type VideoFormatStyle = 'motionExplainer' | 'whiteboard' | 'cinematic';
 export type AspectRatioType = '9:16' | '16:9' | '1:1';
 
 export const VIDEO_FORMAT_STYLES: { id: VideoFormatStyle; name: string; desc: string; badge: string }[] = [
-  { id: 'motionExplainer', name: 'DistilBook Motion Explainer', desc: 'Chapter progress bars, floating framed showcase card & kinetic subtitle capsule', badge: 'Recommended' },
-  { id: 'whiteboard', name: 'DistilBook Whiteboard Explainer', desc: 'Clean bright minimalist canvas, sketch frames & diagrammatic callouts', badge: 'Clean' },
-  { id: 'cinematic', name: 'Cinematic Reel Cover', desc: 'Full-bleed Ken-Burns zoom, dramatic bottom scrim & bold lower-third', badge: 'Classic' },
+  { id: 'motionExplainer', name: 'Motion Explainer Reel', desc: 'Segmented scene progress, floating showcase frame & speech subtitle capsule', badge: 'Recommended' },
+  { id: 'whiteboard', name: 'Studio Whiteboard Explainer', desc: 'Clean bright minimalist canvas, framed product focus & crisp callouts', badge: 'Clean' },
+  { id: 'cinematic', name: 'Cinematic Full-Bleed Reel', desc: 'Dynamic Ken-Burns zoom, dramatic lighting & high-impact lower third', badge: 'Classic' },
 ];
 
 export const ASPECT_RATIOS: { id: AspectRatioType; label: string; ratio: string }[] = [
@@ -92,7 +92,7 @@ export interface VideoSpec {
   voiceover?: VoiceoverSpec | null;
   /** Scene transition style */
   transition?: TransitionType;
-  /** Video presentation format: DistilBook motion explainer, whiteboard or cinematic */
+  /** Video presentation format: motion explainer, whiteboard or cinematic */
   videoStyle?: VideoFormatStyle;
   /** Video aspect ratio */
   aspect?: AspectRatioType;
@@ -257,7 +257,7 @@ function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   }
 }
 
-/** DistilBook-style segmented chapter progress bar across the top */
+/** Segmented scene progress bar across the top */
 function drawChapterBars(
   ctx: CanvasRenderingContext2D,
   currentIdx: number,
@@ -296,8 +296,8 @@ function drawChapterBars(
   ctx.restore();
 }
 
-/** DistilBook floating showcase card for product image or vector motif */
-function drawDistilShowcaseCard(
+/** Floating showcase card for product image or vector motif */
+function drawShowcaseCard(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement | null,
   w: number,
@@ -369,8 +369,8 @@ function drawDistilShowcaseCard(
   ctx.restore();
 }
 
-/** DistilBook-style spoken subtitle capsule pill */
-function drawDistilSubtitleCapsule(
+/** Spoken subtitle capsule pill */
+function drawSubtitleCapsule(
   ctx: CanvasRenderingContext2D,
   subtitle: string,
   w: number,
@@ -600,14 +600,14 @@ export async function renderPromoVideo(
         const scene = spec.scenes[sceneIdx];
 
         if (formatStyle === 'motionExplainer' || formatStyle === 'whiteboard') {
-          // ── DistilBook Motion / Whiteboard Explainer ──
+          // ── Motion / Whiteboard Explainer ──
           // 1. Top Chapter progress bar
           drawChapterBars(ctx, sceneIdx, localProgress, totalScenes, W, p.accent, isWhiteboard);
 
           // 2. Top Chapter Tag Pill
           ctx.save();
           ctx.font = `700 22px ${SANS}`;
-          const chapterText = `CHAPTER ${sceneIdx + 1} OF ${spec.scenes.length}`;
+          const chapterText = `SCENE ${sceneIdx + 1} OF ${spec.scenes.length}`;
           const pillW = ctx.measureText(chapterText).width + 50;
           const pillX = (W - pillW) / 2;
           ctx.fillStyle = isWhiteboard ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)';
@@ -627,7 +627,7 @@ export async function renderPromoVideo(
           ctx.restore();
 
           // 3. Central Framed Showcase Card (images stay complete without getting cropped)
-          drawDistilShowcaseCard(ctx, img, W, H, p, localProgress, isWhiteboard);
+          drawShowcaseCard(ctx, img, W, H, p, localProgress, isWhiteboard);
 
           // 4. Kinetic Typography (Scene Title)
           const titleY = H > 1400 ? H * 0.58 : H * 0.60;
@@ -650,9 +650,9 @@ export async function renderPromoVideo(
           tLines.forEach((l, i) => ctx.fillText(l, 70, titleY + slide + 20 + i * (size * 1.12)));
           ctx.restore();
 
-          // 5. DistilBook Voiceover Subtitle Capsule
+          // 5. Voiceover Subtitle Capsule
           if (scene.subtitle) {
-            drawDistilSubtitleCapsule(ctx, scene.subtitle, W, H, localProgress, isWhiteboard);
+            drawSubtitleCapsule(ctx, scene.subtitle, W, H, localProgress, isWhiteboard);
           }
         } else {
           // ── Cinematic Full-Bleed Reel ──
