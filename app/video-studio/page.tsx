@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Film, ChevronDown, Sparkles, AlertCircle, RefreshCw, Download, Clock, Music, Camera,
   Fish, Target, Mic, PenLine, Image as ImageIcon, Clapperboard, Scissors, Megaphone,
-  Edit3, Check, Palette, Layers, Layout, Monitor, UserCheck, CheckCircle2 } from 'lucide-react';
+  Edit3, Check, Palette, Layers, Layout, Monitor, CheckCircle2, Wand2, Plus, Trash2, ArrowRight } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card, Field, inputCls, CopyButton, Skeleton, Tabs, PageHeader, EmptyState } from '../components/ui';
@@ -46,6 +47,7 @@ interface VideoScript {
 type TabKey = 'script' | 'scenes' | 'caption' | 'production';
 
 function VideoStudioInner() {
+  const router = useRouter();
   const toast = useToast();
   const [form, setForm] = useState({
     businessName: '', category: '', productDescription: '',
@@ -55,14 +57,21 @@ function VideoStudioInner() {
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<VideoScript | null>(null);
 
-  // Restore the last generation AFTER hydration — reading sessionStorage in
-  // the initial render makes server and client HTML diverge (hydration error).
+  // Restore the last generation AFTER hydration + load any saved photos from Visual Studio
   useEffect(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem('gm_video_result') || 'null');
       if (saved) setResult(saved);
     } catch { /* corrupt save — start fresh */ }
+
+    try {
+      const savedPhotos = JSON.parse(sessionStorage.getItem('gm_uploaded_photos') || '[]');
+      if (Array.isArray(savedPhotos) && savedPhotos.length > 0) {
+        setPhotos(savedPhotos);
+      }
+    } catch { /* ignore */ }
   }, []);
+
   const updateResult = (r: VideoScript | null) => { setResult(r); try { sessionStorage.setItem('gm_video_result', JSON.stringify(r)); } catch { /* quota */ } };
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('script');
@@ -84,63 +93,33 @@ function VideoStudioInner() {
   const [editingHook, setEditingHook] = useState(false);
   const [editingSceneIdx, setEditingSceneIdx] = useState<number | null>(null);
 
-  // AI Visuals & Presenter Approval Stage
-  const [approvedImages, setApprovedImages] = useState<(string | null)[]>([null, null, null, null]);
-  const [visualMode, setVisualMode] = useState<'ai_presenter' | 'product_showcase'>('ai_presenter');
-  const [aiImagesLoading, setAiImagesLoading] = useState(false);
-  const [generatingSceneIdx, setGeneratingSceneIdx] = useState<number | null>(null);
-
-  const generateSceneVisual = async (idx: number, explicitMode?: 'ai_presenter' | 'product_showcase') => {
-    if (!result || !result.scenes[idx]) return;
-    const sc = result.scenes[idx];
-    const modeToUse = explicitMode || visualMode;
-    setGeneratingSceneIdx(idx);
-    try {
-      let prompt = '';
-      if (modeToUse === 'ai_presenter') {
-        const presenterRole = idx === 0
-          ? 'charismatic attractive Indian female creator smiling and holding product'
-          : idx === 1
-          ? 'Indian presenter demonstrating key product detail closeup in modern studio'
-          : idx === 2
-          ? 'happy satisfied Indian customer wearing or using product at home'
-          : 'Indian store creator warmly waving and inviting customers to order';
-        prompt = `Vertical 9:16 portrait of ${presenterRole}, presenting ${form.productDescription.slice(0, 90)}, ${form.category} context, cinematic lighting, 8k resolution, authentic Indian setting, photorealistic`;
-      } else {
-        prompt = `Vertical 9:16 high-end commercial ad still of ${sc.visual || form.productDescription.slice(0, 90)}, ${form.category} advertising, studio lighting, hyperrealistic, no text`;
-      }
-
-      const res = await authFetch('/api/scene-image', { prompt, aspect: selectedAspect });
-      const data = await res.json();
-      if (data.imageDataUrl) {
-        setApprovedImages((prev) => {
-          const next = [...prev];
-          next[idx] = data.imageDataUrl;
-          return next;
-        });
-        toast(`Scene ${idx + 1} visual generated! Review and approve below.`, 'ai');
-      } else {
-        throw new Error(data.error || 'Failed to generate visual');
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Could not generate visual', 'error');
-    } finally {
-      setGeneratingSceneIdx(null);
-    }
+  const addCustomScene = () => {
+    if (!result) return;
+    const newSceneNum = result.scenes.length + 1;
+    const newScene: Scene = {
+      scene_number: newSceneNum,
+      duration_seconds: 3,
+      shot_type: 'Product Showcase',
+      visual: `Detailed showcase angle of ${form.productDescription || 'product'}`,
+      voiceover: 'Experience the quality and craft for yourself.',
+      text_overlay: form.businessName || 'Special Offer',
+      music_mood: 'Upbeat',
+    };
+    const updated = { ...result, scenes: [...result.scenes, newScene] };
+    updateResult(updated);
+    setEditingSceneIdx(result.scenes.length);
+    toast('Custom scene added! Edit details below.', 'ai');
   };
 
-  const generateAllSceneVisuals = async () => {
-    if (!result) return;
-    setAiImagesLoading(true);
-    try {
-      const sceneCount = Math.min(4, result.scenes.length || 1);
-      for (let i = 0; i < sceneCount; i++) {
-        await generateSceneVisual(i);
-      }
-      toast('All AI scene visuals generated! Review each frame and approve to render.', 'ai');
-    } finally {
-      setAiImagesLoading(false);
-    }
+  const deleteScene = (idx: number) => {
+    if (!result || result.scenes.length <= 1) return;
+    const filtered = result.scenes.filter((_, i) => i !== idx).map((s, i) => ({
+      ...s,
+      scene_number: i + 1,
+    }));
+    updateResult({ ...result, scenes: filtered });
+    setEditingSceneIdx(null);
+    toast('Scene removed', 'info');
   };
 
   const updateScene = (idx: number, patch: Partial<Scene>) => {
@@ -160,28 +139,19 @@ function VideoStudioInner() {
     updateResult({ ...result, hook_line: val });
   };
 
-  // Build a real promo video from the generated scenes: AI stills from our
-  // /api/scene-image route animated with Ken-Burns + text overlays, recorded
-  // to an MP4/WebM file.
+  // Build a real promo video from the generated scenes: user's photos or AI stills animated with Ken-Burns + text overlays
   const makeVideo = async () => {
     if (!result) return;
     setVideoBusy(true); setVideoError(''); setVideo(null); setVideoPct(0);
     try {
-      // Scene images follow the SCREENPLAY: each scene's own `visual` line
-      // becomes that scene's image prompt (not a mash of everything), plus
-      // category and product context. The renderer fetches each prompt from
-      // /api/scene-image at render time; any scene that fails degrades to an
-      // animated gradient.
-      const scenes = (result.scenes || []).slice(0, 4).map((sc) => ({
+      const scenes = (result.scenes || []).slice(0, 6).map((sc) => ({
         imagePrompt: `${sc.visual}. ${form.category} context: ${form.productDescription.slice(0, 120)}`,
-        // Caption on the video = the scene's on-screen text overlay, exactly
-        // as the script director wrote it; the spoken line rides underneath.
         title: (sc.text_overlay || sc.visual || '').slice(0, 70),
         subtitle: (sc.voiceover || '').slice(0, 110) || undefined,
       }));
       const sceneList = scenes.length ? scenes : [{ title: result.title, subtitle: result.hook_line }];
-      // Use approved AI images, user's uploaded photos, or fallback to auto scene generator
-      const effectivePhotos = sceneList.map((_, i) => approvedImages[i] ?? photos[i] ?? null);
+      // Use user's uploaded photos for each scene (or fallback to auto scene image generator)
+      const effectivePhotos = sceneList.map((_, i) => photos[i] ?? null);
       const out = await renderPromoVideo(
         {
           scenes: sceneList,
@@ -219,7 +189,12 @@ function VideoStudioInner() {
     }
     setError(''); setGenerating(true); updateResult(null);
     try {
-      const res = await authFetch('/api/generate-video-script', { ...form, duration: Number(form.duration) }, { method: 'POST' });
+      const payload = {
+        ...form,
+        duration: Number(form.duration),
+        photoCount: photos.length > 0 ? photos.length : undefined,
+      };
+      const res = await authFetch('/api/generate-video-script', payload, { method: 'POST' });
       const ct = res.headers.get('content-type') || '';
       if (!ct.includes('application/json')) {
         console.error('generate-video-script returned non-JSON', res.status);
@@ -300,7 +275,44 @@ function VideoStudioInner() {
                 onChange={(e) => setForm({ ...form, productDescription: e.target.value })} />
             </Field>
 
-            <PhotoPicker photos={photos} onChange={setPhotos} max={6} />
+            <div className="space-y-2">
+              <PhotoPicker photos={photos} onChange={setPhotos} max={6} />
+
+              {photos.length === 0 ? (
+                <div className="p-3.5 rounded-2xl bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-[var(--accent-soft)] flex items-center gap-1.5">
+                      <Wand2 size={13} /> Don&apos;t have product photos?
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                      Generate AI brand ambassadors, commercial product macros & festival mood shots in Visual Studio.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => router.push('/visual-studio')}
+                    className="shrink-0 text-xs text-[var(--accent-soft)] hover:bg-[color-mix(in_srgb,var(--accent)_15%,transparent)]"
+                  >
+                    Visual Studio <ArrowRight size={12} className="ml-1" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 size={13} /> {photos.length} photo{photos.length > 1 ? 's' : ''} uploaded. Video script will be generated for exactly {photos.length} matching scene{photos.length > 1 ? 's' : ''}.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPhotos([])}
+                    className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] underline ml-2"
+                  >
+                    Clear photos
+                  </button>
+                </div>
+              )}
+            </div>
 
             <Field label="Target audience">
               <input className={inputCls} placeholder="e.g. Women 25–40, small business owners..." value={form.targetAudience}
@@ -441,149 +453,19 @@ function VideoStudioInner() {
                     )}
                   </div>
 
-                  {/* AI Human Presenter & Scene Visuals Approval Studio */}
-                  <div className="mt-5 rounded-2xl border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--accent)_6%,transparent)] p-5">
-                    <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-                      <div>
-                        <div className="text-xs text-[var(--accent-soft)] uppercase tracking-widest font-semibold flex items-center gap-1.5">
-                          <UserCheck size={12} /> AI Presenter & Scene Visuals Studio
-                        </div>
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                          Generate AI human creators or studio visuals, review each scene image, and approve before rendering.
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => generateAllSceneVisuals()}
-                          disabled={aiImagesLoading}
-                          loading={aiImagesLoading}
-                        >
-                          <Sparkles size={12} /> {approvedImages.some(Boolean) ? 'Re-generate All Visuals' : 'Generate AI Visuals'}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Visual Style Selector */}
-                    <div className="flex items-center gap-2 mb-4 flex-wrap">
-                      <span className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider">Visual Style:</span>
-                      <button
-                        type="button"
-                        onClick={() => setVisualMode('ai_presenter')}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
-                          visualMode === 'ai_presenter'
-                            ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
-                            : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)]'
-                        }`}
-                      >
-                        <UserCheck size={11} /> AI Human Presenter (Indian Creator)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVisualMode('product_showcase')}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
-                          visualMode === 'product_showcase'
-                            ? 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)]'
-                            : 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
-                        }`}
-                      >
-                        <Camera size={11} /> Studio Product Showcase
-                      </button>
-                    </div>
-
-                    {/* Scene Visuals Approval Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {(result.scenes || []).slice(0, 4).map((sc, idx) => {
-                        const img = approvedImages[idx];
-                        const isGenerating = generatingSceneIdx === idx;
-                        return (
-                          <div
-                            key={sc.scene_number}
-                            className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-2.5 flex flex-col justify-between group hover:border-[var(--accent)]/40 transition-all"
-                          >
-                            <div className="flex items-center justify-between mb-1.5 px-1">
-                              <span className="text-[10px] font-semibold text-[var(--text-faint)] uppercase">
-                                Scene {sc.scene_number}
-                              </span>
-                              {img ? (
-                                <span className="text-[9px] text-emerald-400 font-medium flex items-center gap-0.5">
-                                  <CheckCircle2 size={10} /> Approved
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-[var(--text-faint)]">Pending AI</span>
-                              )}
-                            </div>
-
-                            {/* Image Preview / Placeholder */}
-                            <div className="w-full aspect-[9/16] bg-[var(--bg-alt)] rounded-xl overflow-hidden relative border border-[var(--border-soft)] mb-2 flex items-center justify-center">
-                              {img ? (
-                                <>
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={img}
-                                    alt={`Scene ${sc.scene_number}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => generateSceneVisual(idx)}
-                                      className="text-[11px] bg-white text-black px-2.5 py-1 rounded-full font-medium shadow-lg hover:scale-105 transition-all flex items-center gap-1"
-                                    >
-                                      <RefreshCw size={10} /> Re-roll
-                                    </button>
-                                  </div>
-                                </>
-                              ) : isGenerating ? (
-                                <div className="text-center p-2 space-y-1">
-                                  <RefreshCw size={16} className="animate-spin text-[var(--accent-soft)] mx-auto" />
-                                  <p className="text-[9px] text-[var(--text-muted)] animate-pulse">Generating...</p>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => generateSceneVisual(idx)}
-                                  className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-[var(--text-faint)] hover:text-[var(--accent-soft)] transition-colors group/btn"
-                                >
-                                  <Sparkles size={16} className="mb-1 text-[var(--accent-soft)]/60 group-hover/btn:scale-110 transition-transform" />
-                                  <span className="text-[10px] font-medium leading-tight">Create Visual</span>
-                                </button>
-                              )}
-                            </div>
-
-                            <p className="text-[10px] text-[var(--text-muted)] line-clamp-2 px-1 mb-2 leading-tight">
-                              {sc.visual}
-                            </p>
-
-                            <button
-                              type="button"
-                              onClick={() => generateSceneVisual(idx)}
-                              disabled={isGenerating}
-                              className="w-full py-1 rounded-lg text-[10px] border border-[var(--border)] text-[var(--text-soft)] hover:bg-[var(--hover-fill)] transition-all flex items-center justify-center gap-1"
-                            >
-                              <RefreshCw size={9} className={isGenerating ? 'animate-spin' : ''} />
-                              {img ? 'Regenerate Frame' : 'Generate Frame'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
                   {/* Promo video maker */}
                   <div className="mt-5 rounded-2xl border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] bg-[color-mix(in_srgb,var(--neon)_6%,transparent)] p-4">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
                         <div className="text-xs text-[var(--neon)] uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clapperboard size={11} /> Promo Video</div>
                         <p className="text-xs text-[var(--text-muted)]">
-                          {approvedImages.some(Boolean)
-                            ? 'Approved AI scenes ready — render with motion transitions and voice.'
-                            : 'Your photos or AI scene visuals become the video with voice narration.'}
+                          {photos.length > 0
+                            ? `Using your ${photos.length} uploaded photo${photos.length > 1 ? 's' : ''} with motion transitions, theme styling & synchronized voice.`
+                            : 'AI scene visuals with motion transitions, theme styling & synchronized voice.'}
                         </p>
                       </div>
                       <Button size="sm" onClick={makeVideo} disabled={videoBusy}>
-                        {videoBusy ? `Rendering ${Math.round(videoPct * 100)}%…` : approvedImages.some(Boolean) ? <><Film size={13} /> Render Video with Approved Visuals 🎬</> : <><Film size={13} /> Create Video</>}
+                        {videoBusy ? `Rendering ${Math.round(videoPct * 100)}%…` : <><Film size={13} /> Render Video 🎬</>}
                       </Button>
                     </div>
 
@@ -743,6 +625,22 @@ function VideoStudioInner() {
                     {/* Scenes tab */}
                     {activeTab === 'scenes' && (
                       <div id="video-tab-scenes" role="tabpanel" className="space-y-4">
+                        <div className="p-3.5 rounded-2xl bg-[var(--card)] border border-[var(--border)] text-xs text-[var(--text-muted)] flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <span className="font-semibold text-[var(--text)]">💡 Optional starting point:</span>
+                            <span className="ml-1 text-[var(--text-muted)]">Customize text overlays, voiceovers, shot durations, or craft your own scenes from scratch.</span>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={addCustomScene}
+                            className="text-xs text-[var(--accent-soft)] hover:bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]"
+                          >
+                            <Plus size={12} className="mr-1" /> Add Custom Scene
+                          </Button>
+                        </div>
+
                         <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-muted)] pb-1 flex-wrap">
                           <span>{result.scenes.length} Scenes in Storyboard</span>
                           <span className="text-[var(--accent-soft)]">Click &ldquo;Edit Scene&rdquo; on any scene to customize titles, visual cues & voiceover</span>
@@ -750,7 +648,7 @@ function VideoStudioInner() {
                         {result.scenes.map((scene, idx) => {
                           const isEditing = editingSceneIdx === idx;
                           return (
-                            <div key={scene.scene_number} className="bg-[var(--bg-alt)] border border-[var(--border)] rounded-2xl p-5 transition-all">
+                            <div key={scene.scene_number || idx} className="bg-[var(--bg-alt)] border border-[var(--border)] rounded-2xl p-5 transition-all">
                               <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
                                 <div className="flex items-center gap-2.5">
                                   <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] text-[var(--accent-soft)] border border-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
@@ -758,14 +656,24 @@ function VideoStudioInner() {
                                   </span>
                                   <span className="text-xs text-[var(--text-muted)]">{scene.duration_seconds}s · {scene.shot_type}</span>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs text-[var(--text-faint)] italic hidden sm:inline">{scene.music_mood}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-[var(--text-faint)] italic hidden sm:inline mr-1">{scene.music_mood}</span>
                                   <button
                                     onClick={() => setEditingSceneIdx(isEditing ? null : idx)}
                                     className="flex items-center gap-1.5 text-xs text-[var(--accent-soft)] hover:underline font-medium px-2.5 py-1 rounded-lg hover:bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] transition-all"
                                   >
                                     {isEditing ? <><Check size={11} /> Done</> : <><Edit3 size={11} /> Edit Scene</>}
                                   </button>
+                                  {result.scenes.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteScene(idx)}
+                                      className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] p-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] transition-all"
+                                      title="Delete Scene"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 

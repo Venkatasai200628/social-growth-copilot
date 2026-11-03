@@ -331,12 +331,23 @@ function drawShowcaseCard(
   ctx.clip();
 
   if (img) {
-    const zoom = 1.02 + 0.06 * local;
-    const s = Math.max(cardW / img.width, cardH / img.height) * zoom;
+    // 1. Draw ambient background backing so letterbox areas look intentionally luxury
+    const bgGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    bgGrad.addColorStop(0, isWhiteboard ? '#f1f5f9' : p.bg1);
+    bgGrad.addColorStop(1, isWhiteboard ? '#e2e8f0' : p.bg2);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(cardX, cardY, cardW, cardH);
+
+    // 2. Proportional Contain with padding so human presenters and products are NEVER cut off!
+    const pad = 12;
+    const availW = cardW - pad * 2;
+    const availH = cardH - pad * 2;
+    const zoom = 1.0 + 0.03 * local;
+    const s = Math.min(availW / img.width, availH / img.height) * zoom;
     const dw = img.width * s;
     const dh = img.height * s;
     const dx = cardX + (cardW - dw) / 2;
-    const dy = cardY + (cardH - dh) / 2 - 10 * local;
+    const dy = cardY + (cardH - dh) / 2;
     ctx.drawImage(img, dx, dy, dw, dh);
   } else {
     // Elegant graphic vector backdrop

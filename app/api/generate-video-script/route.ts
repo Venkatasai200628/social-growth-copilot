@@ -33,11 +33,15 @@ ${festivalPrompt(festival, [productDescription, style].filter(Boolean).join(' ')
 CRITICAL CURRENT YEAR CONSTRAINT: The current calendar year is 2026. NEVER output '2024' or past years in video titles, hooks, voiceover lines, or overlays. Any festive season, collection, or offer is in 2026 (or 2027).
 EVERY scene must visually reference the ACTUAL product/service details from the brief (dish names, materials, city, offer) — a scene that could belong to any business is a failure. text_overlay is the caption burned onto the video for that scene: 3-7 punchy English words, not a stage direction. The visual field of each scene is used VERBATIM as the AI image-generation prompt for that scene — write it as a concrete, filmable shot description (subject, action, setting, lighting), never a vague instruction. The voiceover_script, hook_line, scene voiceovers, text overlays, caption and cta must all be in English (Indian English phrasing). NEVER invent offers, discounts, delivery promises, locations or ingredients the owner did not state — if there is no offer, make the CTA about visiting/enquiring/ordering. Field names stay English. Respond ONLY with valid JSON — no markdown, no code fences.`;
 
+    const countConstraint = typeof photoCount === 'number' && photoCount > 0
+      ? `EXACT SCENE COUNT CONSTRAINT: The owner uploaded exactly ${Math.min(photoCount, 6)} photos. You MUST generate EXACTLY ${Math.min(photoCount, 6)} scene items in the "scenes" array (one scene matching each photo sequentially). Do NOT generate more or fewer scenes than ${Math.min(photoCount, 6)}.`
+      : '';
+
     const prompt = `Create a complete video production package for "${businessName}" (${category}).
 
 PRODUCT: ${productDescription}
-${typeof photoCount === 'number' && photoCount > 0 ? `OWNER PHOTOS: the owner uploaded ${Math.min(photoCount, 6)} real photos of their items — the FIRST ${Math.min(photoCount, 6)} scenes must show exactly those items (the photos become the video's opening shots)
-` : ''}AUDIENCE: ${targetAudience || 'general audience'}
+${countConstraint}
+AUDIENCE: ${targetAudience || 'general audience'}
 PLATFORM: ${platform} (${duration}-second video)
 STYLE: ${style || 'natural and authentic'}
 GOAL: ${goal || 'engagement'}

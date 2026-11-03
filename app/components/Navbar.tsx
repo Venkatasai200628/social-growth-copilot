@@ -4,12 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Zap, LayoutDashboard, Star, MessageCircle, Calendar, Home,
-  Menu, X, LogOut, User, ImageIcon, ChevronDown, Film, Sun, Moon, Leaf, Sparkles, Users } from 'lucide-react';
+  Menu, X, LogOut, User, ImageIcon, ChevronDown, Film, Sun, Moon, Leaf, Sparkles, Users, Wand2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from './ThemeProvider';
 
 // Internal studio tools grouped inside the Tools dropdown
 const studioTools = [
+  { href: '/visual-studio', label: 'Visual Studio', desc: 'AI brand ambassadors, studio visuals & concept photos', icon: Wand2, color: 'var(--accent-soft)' },
   { href: '/post-studio', label: 'Post Studio', desc: 'AI festival posters, 1:1, 4:5 & 9:16', icon: ImageIcon, color: 'var(--accent-soft)' },
   { href: '/video-studio', label: 'Video Studio', desc: 'Motion explainers, promo reels & AI voiceovers', icon: Film, color: 'var(--neon)' },
   { href: '/campaign', label: 'Campaign Generator', desc: 'Multi-day plan with budget split', icon: Zap, color: 'var(--gold)' },
@@ -21,6 +22,7 @@ const studioTools = [
 // Public navigation shown when visitor is not logged in
 const publicNavLinks = [
   { href: '/home', label: 'Dashboard', icon: Home },
+  { href: '/visual-studio', label: 'Visual Studio', icon: Wand2 },
   { href: '/post-studio', label: 'Post Studio', icon: ImageIcon },
   { href: '/video-studio', label: 'Video Studio', icon: Film },
   { href: '/#features', label: 'Features', icon: Sparkles },
