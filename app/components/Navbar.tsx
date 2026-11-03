@@ -21,11 +21,9 @@ const studioTools = [
 
 // Public navigation shown when visitor is not logged in
 const publicNavLinks = [
-  { href: '/home', label: 'Dashboard', icon: Home },
-  { href: '/visual-studio', label: 'Visual Studio', icon: Wand2 },
-  { href: '/post-studio', label: 'Post Studio', icon: ImageIcon },
-  { href: '/video-studio', label: 'Video Studio', icon: Film },
-  { href: '/#features', label: 'Features', icon: Sparkles },
+  { href: '/#overview', label: 'Overview', icon: Sparkles },
+  { href: '/#studios', label: 'Creative Studios', icon: ImageIcon },
+  { href: '/#how', label: 'How It Works', icon: Film },
   { href: '/#experts', label: 'Creative Experts', icon: Users },
 ];
 

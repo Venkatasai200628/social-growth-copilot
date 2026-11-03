@@ -258,20 +258,33 @@ function VisualStudioInner() {
             </div>
 
             <div>
-              <label className="block text-xs text-[var(--text-muted)] uppercase tracking-widest mb-2">Variations to Generate</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs text-[var(--text-muted)] uppercase tracking-widest">
+                  Camera Angles & Shot Variations
+                </label>
+                <span className="text-[10px] text-[var(--accent-soft)]">
+                  {form.count === 1 ? '1 Hero Still' : form.count === 2 ? '2 Angles (Hero + Macro)' : form.count === 3 ? '3 Angles (+ Lifestyle)' : '4 Distinct Perspectives'}
+                </span>
+              </div>
               <div className="flex gap-2">
-                {[1, 2, 3, 4].map((n) => (
+                {[
+                  { n: 1, label: '1 Shot', sub: 'Hero still' },
+                  { n: 2, label: '2 Shots', sub: 'Hero + Macro' },
+                  { n: 3, label: '3 Shots', sub: '+ Lifestyle' },
+                  { n: 4, label: '4 Shots', sub: 'All 4 angles' },
+                ].map(({ n, label, sub }) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => setForm({ ...form, count: n })}
-                    className={`flex-1 py-2 rounded-xl text-xs border transition-all ${
+                    className={`flex-1 py-1.5 px-1 rounded-xl text-xs border transition-all text-center flex flex-col items-center justify-center ${
                       form.count === n
-                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm'
                         : 'bg-[var(--input-bg)] border-[var(--input-border)] text-[var(--text-muted)] hover:text-[var(--text)]'
                     }`}
                   >
-                    {n} {n === 1 ? 'Shot' : 'Shots'}
+                    <span className="font-semibold text-xs leading-none">{label}</span>
+                    <span className={`text-[9px] mt-0.5 leading-none ${form.count === n ? 'text-white/80' : 'text-[var(--text-faint)]'}`}>{sub}</span>
                   </button>
                 ))}
               </div>
