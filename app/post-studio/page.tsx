@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Sparkles, AlertCircle, Lock, Download, Clock, MessageSquare, Mic, MicOff, Upload, X,
-  Image as ImageIcon, Zap, Send, Heart, MessageCircle, Instagram, Wallet,
+  Image as ImageIcon, Send, Heart, MessageCircle, Instagram, Wallet,
   Camera, ChevronDown, Wand2, Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
@@ -108,15 +108,15 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
       </div>
 
       {/* poster + IG context preview */}
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-6 items-start">
         <div className="relative group">
           <canvas ref={canvasRef} className="w-full rounded-2xl border border-[var(--border)] shadow-2xl" style={{ display: 'block' }} />
           {!fontsReady && <div className="absolute inset-0 shimmer rounded-2xl" />}
         </div>
 
         {/* Instagram-context preview — how followers will see it */}
-        <div className="mx-auto w-full max-w-[300px] rounded-[2rem] border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-xl">
-          <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[var(--border)]">
+        <div className="mx-auto w-full max-w-[340px] rounded-[2rem] border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-xl">
+          <div className="flex items-center gap-2.5 px-3.5 py-3 border-b border-[var(--border)]">
             <div className="w-8 h-8 rounded-full p-[2px]" style={{ background: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)' }}>
               <div className="w-full h-full rounded-full bg-[var(--card)] flex items-center justify-center text-[11px] font-bold text-[var(--text)]">
                 {(brand || 'G').charAt(0).toUpperCase()}
@@ -128,8 +128,15 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
             </div>
             <Instagram size={14} className="text-[var(--text-muted)]" />
           </div>
-          <img src={dataUrl()} alt="Post preview" className="w-full aspect-square object-cover bg-[var(--bg-alt)]" />
-          <div className="px-3 py-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={dataUrl()}
+            alt="Post preview"
+            className={`w-full object-cover bg-[var(--bg-alt)] ${
+              format === '9:16' ? 'aspect-[9/16]' : format === '4:5' ? 'aspect-[4/5]' : 'aspect-square'
+            }`}
+          />
+          <div className="px-3.5 py-3">
             <div className="flex items-center gap-3 mb-2 text-[var(--text)]">
               <Heart size={16} /><MessageCircle size={16} /><Send size={16} />
               <span className="ml-auto text-[10px] text-[var(--text-muted)]">Preview</span>
@@ -209,14 +216,14 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
 function PostStudioInner() {
   const router = useRouter();
   const toast = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
 
   const [form, setForm] = useState({
     businessName: '', category: 'Gold & Jewellery', productDescription: '', targetAudience: '',
     city: '', platform: 'Instagram', postType: 'Feed Post', tone: 'Luxury & Premium',
     goal: 'Drive Sales', offer: '', customPrompt: '',
   });
-  const [language, setLanguage] = useState('english');
+  const [language] = useState('english');
   const [festival, setFestival] = useState('');
 
   // Festivals page deep-link: /post-studio?festival=diwali
@@ -335,6 +342,7 @@ function PostStudioInner() {
                   className="w-24 h-24 rounded-2xl border-2 border-dashed border-[var(--border)] hover:border-[var(--accent)] flex flex-col items-center justify-center gap-1 text-[var(--text-muted)] hover:text-[var(--accent-soft)] transition-all overflow-hidden flex-shrink-0"
                   aria-label="Upload product photo"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   {photo ? <img src={photo} alt="Product" className="w-full h-full object-cover" /> : <><Upload size={18} /><span className="text-[10px]">Add photo</span></>}
                 </button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0] ?? null)} />
@@ -531,6 +539,7 @@ function PostStudioInner() {
                     {result.image_url && (
                       <div>
                         <p className="text-xs uppercase tracking-widest text-[var(--text-muted)] mb-2">AI background image (optional)</p>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={result.image_url} alt="AI generated" className="w-full rounded-2xl border border-[var(--border)]" />
                       </div>
                     )}

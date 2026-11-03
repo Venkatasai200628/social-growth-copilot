@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Mail, LogOut, Shield, Zap, Loader2, TrendingUp, Sparkles, Calendar,
-  Video, Star, MessageCircle, Lightbulb, Sun, Moon, Wallet, Wallet2, Camera,
+  Video, Star, MessageCircle, Lightbulb, Sun, Moon, Wallet2, Camera,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { db } from '@/lib/firebase';

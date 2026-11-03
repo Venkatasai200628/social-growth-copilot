@@ -28,11 +28,6 @@ type Language = keyof typeof SARVAM_LANGUAGES;
 /** Set (not `in`) so prototype keys like "toString" can never pass validation. */
 const LANGUAGE_KEYS = new Set<string>(Object.keys(SARVAM_LANGUAGES));
 
-/** Human-readable language descriptors (kept for Sarvam prompt context). */
-const LANGUAGE_DESC: Record<Language, string> = {
-  english: 'Indian-English',
-};
-
 /** Clamp to MAX_CHARS, breaking at a clean word boundary when possible. */
 function clampText(raw: string): string {
   const text = raw.trim();

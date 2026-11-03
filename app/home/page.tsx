@@ -154,7 +154,7 @@ function HomeInner() {
   return (
     <main className="min-h-screen relative overflow-hidden">
       <div className="orb w-[600px] h-[600px] bg-[color-mix(in_srgb,var(--accent)_9%,transparent)] top-[-180px] right-[-140px]" />
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-14">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-14">
 
         {/* Greeting */}
         <div className="animate-fade-up">
@@ -167,10 +167,10 @@ function HomeInner() {
 
         {/* Festival Strip */}
         {festivalStrip && (
-          <div className="mt-8 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
+          <div className="mt-8 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
             style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--gold) 15%, transparent), color-mix(in srgb, var(--gold) 8%, transparent))', border: '1px solid color-mix(in srgb, var(--gold) 30%, transparent)' }}>
             <div className="flex items-center gap-3">
-              <span className="text-lg">🎉</span>
+              <span className="text-xl">🎉</span>
               <div>
                 <span className="text-sm font-semibold text-[var(--text)]">{festivalStrip.name}</span>
                 <span className="text-xs text-[var(--text-muted)] ml-2">
@@ -179,7 +179,7 @@ function HomeInner() {
               </div>
             </div>
             <button onClick={() => router.push(`/post-studio?festival=${festivalStrip.id}`)}
-              className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-full font-medium transition-all"
+              className="flex items-center justify-center gap-1.5 text-xs px-4 py-2 rounded-full font-medium transition-all w-full sm:w-auto"
               style={{ background: 'color-mix(in srgb, var(--gold) 20%, transparent)', color: 'var(--gold)', border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)' }}>
               Make your {festivalStrip.name.split(' ')[0]} post <ArrowRight size={12} />
             </button>
@@ -190,15 +190,17 @@ function HomeInner() {
         <div className="grid sm:grid-cols-2 gap-4 mt-10">
           {quickActions.map(({ href, icon: Icon, label, desc, color }) => (
             <button key={href} onClick={() => router.push(href)}
-              className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-0.5 hover:scale-[1.02] transition-all">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
-                <Icon size={22} style={{ color }} />
+              className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-1 transition-all flex flex-col justify-between h-full">
+              <div>
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4"
+                  style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
+                  <Icon size={22} style={{ color }} />
+                </div>
+                <div className="font-display text-base font-bold text-[var(--text)] mb-1.5 flex items-center gap-2">
+                  {label} <ArrowRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--accent-soft)]" />
+                </div>
+                <p className="text-[var(--text-muted)] text-xs leading-relaxed">{desc}</p>
               </div>
-              <div className="font-display text-base font-bold text-[var(--text)] mb-1 flex items-center gap-2">
-                {label} <ArrowRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--accent-soft)]" />
-              </div>
-              <p className="text-[var(--text-muted)] text-xs leading-relaxed">{desc}</p>
             </button>
           ))}
         </div>
@@ -225,10 +227,12 @@ function HomeInner() {
             <div className="grid sm:grid-cols-3 gap-4">
               {campaigns.map((c) => (
                 <button key={c.id} onClick={() => router.push(`/dashboard/${c.id}`)}
-                  className="text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] transition-all">
-                  <div className="text-[10px] text-[var(--text-faint)] uppercase tracking-widest mb-2">{daysSince(c.createdAt)}</div>
-                  <div className="font-display text-sm font-bold text-[var(--text)] truncate mb-1.5">{c.businessName}</div>
-                  <div className="text-xs text-[var(--text-muted)]">
+                  className="text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-1 transition-all flex flex-col justify-between h-full">
+                  <div>
+                    <div className="text-[10px] text-[var(--text-faint)] uppercase tracking-widest mb-2">{daysSince(c.createdAt)}</div>
+                    <div className="font-display text-sm font-bold text-[var(--text)] truncate mb-1.5">{c.businessName}</div>
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)] mt-2">
                     {c.strategyStatus === 'generating' ? 'Strategy building…'
                       : c.strategyStatus === 'failed' ? 'Strategy needs a retry'
                       : (c.loggedDays ?? 0) > 0 ? `${c.loggedDays}/${c.duration} days logged`
@@ -320,13 +324,15 @@ function HomeInner() {
           <div className="grid sm:grid-cols-3 gap-4">
             {toolCards.map(({ href, icon: Icon, label, desc, color }) => (
               <button key={href} onClick={() => router.push(href)}
-                className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-0.5 hover:scale-[1.02] transition-all">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
-                  style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
-                  <Icon size={16} style={{ color }} />
+                className="group text-left bg-[var(--card)] border border-[var(--border)] rounded-3xl p-5 hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:-translate-y-1 transition-all flex flex-col justify-between h-full">
+                <div>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
+                    style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)` }}>
+                    <Icon size={16} style={{ color }} />
+                  </div>
+                  <div className="font-display text-sm font-bold text-[var(--text)] mb-1">{label}</div>
+                  <p className="text-[var(--text-muted)] text-xs leading-relaxed">{desc}</p>
                 </div>
-                <div className="font-display text-sm font-bold text-[var(--text)] mb-1">{label}</div>
-                <p className="text-[var(--text-muted)] text-xs leading-relaxed">{desc}</p>
               </button>
             ))}
           </div>

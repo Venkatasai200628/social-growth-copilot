@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Zap, AlertCircle, ChevronDown, Mic, MicOff, Calendar, Sparkles, Megaphone, Send, X } from 'lucide-react';
+import { Zap, AlertCircle, ChevronDown, Mic, MicOff, Calendar, Sparkles, Send, X } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card, Field, inputCls, CopyButton, Skeleton } from '../components/ui';
@@ -47,7 +47,7 @@ function CampaignInner() {
     product: '', productName: '', category: '', goal: '', budget: '',
     targetAudience: '', platforms: [] as string[], duration: '7', city: '',
   });
-  const [language, setLanguage] = useState('english');
+  const [language] = useState('english');
   const [festivalId, setFestivalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState(0);

@@ -16,8 +16,9 @@ export const LANGUAGES: LanguageOption[] = [
   { id: 'english',  label: 'English',           native: 'English',      speechCode: 'en-IN', promptName: 'Indian English (natural Indian phrasing, not American)' },
 ];
 
-export function languagePrompt(_id?: string): string {
-  return `WRITE ALL CUSTOMER-FACING COPY IN: ${LANGUAGES[0].promptName}. Never use Hindi, Hinglish or any other Indian language, and never write Devanagari or any other Indic script — English words only.`;
+export function languagePrompt(languageId?: string): string {
+  const chosen = LANGUAGES.find((l) => l.id === languageId) ?? LANGUAGES[0];
+  return `WRITE ALL CUSTOMER-FACING COPY IN: ${chosen.promptName}. Never use Hindi, Hinglish or any other Indian language, and never write Devanagari or any other Indic script — English words only.`;
 }
 
 export interface Festival {

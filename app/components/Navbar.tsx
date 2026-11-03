@@ -185,6 +185,7 @@ export default function Navbar() {
               <button onClick={() => setUserMenu(!userMenu)}
                 className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--input-border)] hover:border-[var(--accent)]/30 bg-[var(--input-bg)] hover:bg-[var(--hover-fill)] transition-all">
                 {user.photoURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="w-6 h-6 rounded-full bg-[var(--accent)]/20 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent-soft)] text-[10px] font-medium">

@@ -91,7 +91,7 @@ ${caption_b}
 """` : ''}
 
 Rubric — score each dimension 0-20 for every caption given:
-${DIMENSIONS.map(([k, d]) => `- ${d}`).join('\n')}
+${DIMENSIONS.map(([, d]) => `- ${d}`).join('\n')}
 
 ${hasB ? `Compare A and B head-to-head. Pick ONE winner and explain why in terms of the rubric.
 ` : ''}Respond ONLY in this JSON shape:

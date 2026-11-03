@@ -7,7 +7,6 @@ import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { PageHeader, Card, Field, inputCls, Button, CopyButton, Skeleton } from '../components/ui';
 import { authFetch } from '@/lib/client';
-import { LANGUAGES } from '@/lib/india';
 
 const categories = ['Food & Beverage','Fashion & Clothing','Tech Startup','Events','Real Estate','Education','Healthcare','Gold & Jewellery','Grocery','Beauty & Makeup','B2B Services','Local Business','Other'];
 const tones = ['Friendly & Warm','Professional & Formal','Playful & Fun','Urgent & Sales-Driven','Empathetic & Caring','Bold & Confident','Luxury & Premium'];

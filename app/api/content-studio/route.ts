@@ -8,10 +8,6 @@ import { readJson, badRequest, serverError, str, strArr } from '../_lib/http';
 interface StudioIdea {
   format?: unknown; description?: unknown; example?: unknown; difficulty?: unknown; virality?: unknown;
 }
-interface HookIdea { hook?: unknown; type?: unknown; platform?: unknown; }
-interface AngleIdea { angle?: unknown; description?: unknown; example?: unknown; }
-interface HashtagSetIdea { set_name?: unknown; tags?: unknown; }
-interface PostingTimeIdea { platform?: unknown; times?: unknown; reason?: unknown; }
 interface StudioDataAI {
   reel_formats?: unknown;
   hooks?: unknown;

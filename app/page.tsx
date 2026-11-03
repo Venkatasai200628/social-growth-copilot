@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Zap, Star, MessageCircle, TrendingUp, CheckCircle, ArrowRight,
+  Zap, Star, MessageCircle, TrendingUp, ArrowRight,
   Sparkles, Shield, Clock, Film, ChevronRight, Play, Mic, Languages,
   Calendar, Camera, Brain, Wallet, Store, Gem, UtensilsCrossed, Shirt, Cake,
   Users, Image as ImageIcon, Video, MapPin,

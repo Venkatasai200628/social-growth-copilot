@@ -25,7 +25,7 @@ const DIFF_COLOR: Record<string, string> = { Easy: 'var(--success)', Medium: 'va
 export default function ContentStudioPage() {
   const [category, setCategory] = useState(CATEGORIES[7].value);
   const [goal, setGoal] = useState('Drive Sales / Conversions');
-  const [language, setLanguage] = useState('english');
+  const [language] = useState('english');
   const [platform, setPlatform] = useState('Instagram');
   const [data, setData] = useState<StudioData | null>(null);
   const [loading, setLoading] = useState(false);

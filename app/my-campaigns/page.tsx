@@ -141,7 +141,7 @@ function MyCampaignsInner() {
   return (
     <main className="min-h-screen relative overflow-hidden">
       <div className="orb w-[500px] h-[500px] bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] top-[-150px] right-[-100px]" />
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-14">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-14">
 
         {/* Header */}
         <div className="flex items-center justify-between gap-4 mb-10 flex-wrap">

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, ArrowLeft, ChevronDown, Zap, Gauge, Flame, Lock } from 'lucide-react';
 import { CATEGORIES } from '@/lib/types';
 import AuthGuard from '@/app/components/AuthGuard';
@@ -37,7 +37,6 @@ const efficiencyOptions = [
 
 function OnboardContent() {
   const router = useRouter();
-  const params = useSearchParams();
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
