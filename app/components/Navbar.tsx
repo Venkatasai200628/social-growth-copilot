@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Zap, LayoutDashboard, Star, MessageCircle, Calendar, Home,
-  Menu, X, LogOut, User, ImageIcon, ChevronDown, Film, Sun, Moon, Leaf, Sparkles, Play, Users } from 'lucide-react';
+  Menu, X, LogOut, User, ImageIcon, ChevronDown, Film, Sun, Moon, Leaf, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useTheme } from './ThemeProvider';
 
@@ -20,10 +20,11 @@ const studioTools = [
 
 // Public navigation shown when visitor is not logged in
 const publicNavLinks = [
+  { href: '/home', label: 'Dashboard', icon: Home },
+  { href: '/post-studio', label: 'Post Studio', icon: ImageIcon },
+  { href: '/video-studio', label: 'Video Studio', icon: Film },
   { href: '/#features', label: 'Features', icon: Sparkles },
-  { href: '/#how', label: 'How It Works', icon: Play },
   { href: '/#experts', label: 'Creative Experts', icon: Users },
-  { href: '/#testimonials', label: 'Success Stories', icon: Star },
 ];
 
 export default function Navbar() {

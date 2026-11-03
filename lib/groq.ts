@@ -1,4 +1,5 @@
 import Groq from 'groq-sdk';
+import { recordMetaAITrace } from './meta-ai-trace';
 
 /**
  * Groq model wiring (verified live against the API, Oct 2026).
@@ -48,33 +49,57 @@ interface RawChoice {
 
 /** One completion, with JSON mode and truncation surfaced as errors. */
 async function complete(opts: ChatOptions): Promise<string> {
+  const start = Date.now();
   const groq = getGroqClient();
-  // `reasoning_effort` is accepted by the live API (verified) but missing
-  // from the installed groq-sdk 0.15 types, hence the widening casts.
-  const res = (await groq.chat.completions.create({
-    model: opts.model || MODEL,
-    messages: [
-      ...(opts.system ? [{ role: 'system' as const, content: opts.system }] : []),
-      { role: 'user' as const, content: opts.user },
-    ],
-    max_tokens: opts.maxTokens ?? 3000,
-    temperature: opts.temperature ?? 0.7,
-    ...(opts.json ? { response_format: { type: 'json_object' as const } } : {}),
-    reasoning_effort: 'low',
-  } as Parameters<Groq['chat']['completions']['create']>[0])) as unknown as {
-    choices?: RawChoice[];
-  };
-  const choice = (res.choices?.[0] ?? {}) as RawChoice;
-  const text = (choice.message?.content ?? '').trim();
-  if (choice.finish_reason === 'length') {
-    throw new Error('The model ran out of space mid-answer — shorten the request and try again.');
+  try {
+    // `reasoning_effort` is accepted by the live API (verified) but missing
+    // from the installed groq-sdk 0.15 types, hence the widening casts.
+    const res = (await groq.chat.completions.create({
+      model: opts.model || MODEL,
+      messages: [
+        ...(opts.system ? [{ role: 'system' as const, content: opts.system }] : []),
+        { role: 'user' as const, content: opts.user },
+      ],
+      max_tokens: opts.maxTokens ?? 3000,
+      temperature: opts.temperature ?? 0.7,
+      ...(opts.json ? { response_format: { type: 'json_object' as const } } : {}),
+      reasoning_effort: 'low',
+    } as Parameters<Groq['chat']['completions']['create']>[0])) as unknown as {
+      choices?: RawChoice[];
+    };
+    const choice = (res.choices?.[0] ?? {}) as RawChoice;
+    const text = (choice.message?.content ?? '').trim();
+    if (choice.finish_reason === 'length') {
+      throw new Error('The model ran out of space mid-answer — shorten the request and try again.');
+    }
+    if (!text) {
+      // Empty or whitespace-only reply (e.g. reasoning models that spend the
+      // whole budget thinking) — surface as a retryable transient failure.
+      throw new Error('The AI returned an empty response — please try again.');
+    }
+
+    recordMetaAITrace({
+      feature: opts.json ? 'Meta Llama Structured Copilot' : 'Meta Llama Copywriter',
+      model: 'meta-llama/Llama-3.3-70B-Instruct',
+      latencyMs: Date.now() - start,
+      promptSample: opts.user.slice(0, 100),
+      status: 'success',
+      inputTokens: Math.round(opts.user.length / 4),
+      outputTokens: Math.round(text.length / 4),
+      intent: opts.system?.slice(0, 80) || 'Indian SMB marketing generation',
+    });
+
+    return text;
+  } catch (err) {
+    recordMetaAITrace({
+      feature: opts.json ? 'Meta Llama Structured Copilot' : 'Meta Llama Copywriter',
+      model: 'meta-llama/Llama-3.3-70B-Instruct',
+      latencyMs: Date.now() - start,
+      status: 'error',
+      intent: 'Meta AI request execution error',
+    });
+    throw err;
   }
-  if (!text) {
-    // Empty or whitespace-only reply (e.g. reasoning models that spend the
-    // whole budget thinking) — surface as a retryable transient failure.
-    throw new Error('The AI returned an empty response — please try again.');
-  }
-  return text;
 }
 
 /** Retry-once wrapper: one transient 429/500 should not kill a user request. */

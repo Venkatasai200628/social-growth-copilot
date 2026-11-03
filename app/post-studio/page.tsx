@@ -49,6 +49,7 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [format, setFormat] = useState<PosterFormat>('1:1');
   const [paletteId, setPaletteId] = useState(result.poster.palette);
+  const [customColor, setCustomColor] = useState('#8b5cf6');
   const [layout, setLayout] = useState<PosterLayout>((result.poster.layout as PosterLayout) || 'modern');
   const [fontsReady, setFontsReady] = useState(false);
   const [phone, setPhone] = useState('');
@@ -152,11 +153,38 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
       {/* palette + layout pickers */}
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-widest text-[var(--text-muted)] mb-2 flex items-center gap-1.5"><Wand2 size={11} />Colour mood — tap to restyle instantly</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] uppercase tracking-widest text-[var(--text-muted)] flex items-center gap-1.5">
+              <Wand2 size={11} />Colour Mood & Palette ({PALETTES.length}+ Styles)
+            </p>
+            <label className="inline-flex items-center gap-1.5 text-xs text-[var(--accent-soft)] hover:underline cursor-pointer">
+              <span>Custom:</span>
+              <input
+                type="color"
+                value={customColor}
+                onChange={(e) => {
+                  setCustomColor(e.target.value);
+                  setPaletteId(`custom_${e.target.value.replace('#', '')}`);
+                }}
+                className="w-5 h-5 rounded-full border border-[var(--border)] cursor-pointer p-0 bg-transparent"
+                title="Pick custom brand color"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
+            {paletteId.startsWith('custom_') && (
+              <button
+                onClick={() => setPaletteId(paletteId)}
+                title="Current Custom Brand Color"
+                className="w-9 h-9 rounded-xl border-2 border-[var(--accent)] scale-110 shadow-md relative"
+                style={{ background: customColor }}
+              >
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold">✓</span>
+              </button>
+            )}
             {PALETTES.map((p) => (
               <button key={p.id} onClick={() => setPaletteId(p.id)} title={p.name} aria-label={`Palette ${p.name}`}
-                className={`w-9 h-9 rounded-xl border-2 transition-all ${paletteId === p.id ? 'border-[var(--accent)] scale-110' : 'border-[var(--border)] hover:scale-105'}`}
+                className={`w-9 h-9 rounded-xl border-2 transition-all ${paletteId === p.id ? 'border-[var(--accent)] scale-110 shadow-md' : 'border-[var(--border)] hover:scale-105'}`}
                 style={{ background: `linear-gradient(135deg, ${p.bg1} 55%, ${p.accent} 55%)` }} />
             ))}
           </div>

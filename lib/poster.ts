@@ -47,7 +47,59 @@ export const PALETTES: Palette[] = [
   { id: 'christmasPlum',name: 'Christmas Plum',       light: false, bg1: '#2c0f2c', bg2: '#120412', ink: '#f4ffe9', sub: '#c9d8b8', accent: '#e11d48', accent2: '#4ade80', chipInk: '#2c0f2c' },
   { id: 'tricolor',     name: 'Tricolour Spirit',     light: false, bg1: '#0a2c52', bg2: '#04121f', ink: '#f4f9ff', sub: '#a9c3e0', accent: '#ff9933', accent2: '#138808', chipInk: '#0a2c52' },
   { id: 'monoEditorial',name: 'Mono Editorial',       light: true,  bg1: '#ffffff', bg2: '#ececec', ink: '#0a0a0a', sub: '#5c5c5c', accent: '#e11d2e', accent2: '#0a0a0a', chipInk: '#ffffff' },
+  { id: 'midnightIndigo', name: 'Midnight Indigo & Cyan', light: false, bg1: '#070b1e', bg2: '#02040d', ink: '#e0e7ff', sub: '#a5b4fc', accent: '#06b6d4', accent2: '#6366f1', chipInk: '#070b1e' },
+  { id: 'champagneSilk',  name: 'Champagne & Gold Silk',  light: true,  bg1: '#fcf8f0', bg2: '#f3ebd9', ink: '#292218', sub: '#786851', accent: '#c59b27', accent2: '#dfb74a', chipInk: '#292218' },
+  { id: 'emeraldVelvet',  name: 'Royal Emerald Velvet',   light: false, bg1: '#05231a', bg2: '#01100b', ink: '#e6fcf5', sub: '#99e6cb', accent: '#10b981', accent2: '#34d399', chipInk: '#05231a' },
+  { id: 'sunsetTerracotta', name: 'Sunset Terracotta',    light: false, bg1: '#3d1c14', bg2: '#1b0905', ink: '#fef3ee', sub: '#e5b29f', accent: '#f97316', accent2: '#fb923c', chipInk: '#3d1c14' },
+  { id: 'minimalSlate',   name: 'Minimalist Dark Slate',  light: false, bg1: '#18181b', bg2: '#09090b', ink: '#fafafa', sub: '#a1a1aa', accent: '#38bdf8', accent2: '#818cf8', chipInk: '#18181b' },
+  { id: 'coffeeMocha',    name: 'Artisan Espresso Mocha', light: true,  bg1: '#f8f4f0', bg2: '#ebdcd0', ink: '#362319', sub: '#6f5041', accent: '#854d0e', accent2: '#b45309', chipInk: '#362319' },
+  { id: 'royalAmethyst',  name: 'Regal Amethyst & Gold',  light: false, bg1: '#260a2f', bg2: '#100215', ink: '#fbeeff', sub: '#dcb1e8', accent: '#c084fc', accent2: '#eab308', chipInk: '#260a2f' },
+  { id: 'electricCyber',  name: 'Electric Obsidian Lime', light: false, bg1: '#0c0f12', bg2: '#000000', ink: '#f4f4f5', sub: '#a1a1aa', accent: '#84cc16', accent2: '#22c55e', chipInk: '#0c0f12' },
+  { id: 'pastelSage',     name: 'Pastel Sage & Ivory',    light: true,  bg1: '#f2f7f4', bg2: '#deede4', ink: '#1c2e24', sub: '#516f60', accent: '#059669', accent2: '#10b981', chipInk: '#1c2e24' },
+  { id: 'coralBloom',     name: 'Coral Bloom Chic',       light: true,  bg1: '#fff2f2', bg2: '#ffe0e0', ink: '#3b1818', sub: '#824848', accent: '#f43f5e', accent2: '#fb7185', chipInk: '#3b1818' },
+  { id: 'sapphireBlue',   name: 'Sapphire & Silver Luxe', light: false, bg1: '#081d3d', bg2: '#020917', ink: '#f0f7ff', sub: '#a4cafe', accent: '#3b82f6', accent2: '#93c5fd', chipInk: '#081d3d' },
 ];
+
+/** Dynamically generate a balanced Palette from ANY user-selected hex color */
+export function createCustomPalette(hex: string): Palette {
+  const cleanHex = hex.startsWith('#') ? hex : `#${hex}`;
+  const r = parseInt(cleanHex.slice(1, 3), 16) || 120;
+  const g = parseInt(cleanHex.slice(3, 5), 16) || 80;
+  const b = parseInt(cleanHex.slice(5, 7), 16) || 200;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const isLight = luminance > 0.6;
+
+  if (isLight) {
+    return {
+      id: `custom_${cleanHex.slice(1)}`,
+      name: `Custom (${cleanHex})`,
+      light: true,
+      bg1: '#ffffff',
+      bg2: `${cleanHex}1f`,
+      ink: '#111827',
+      sub: '#4b5563',
+      accent: cleanHex,
+      accent2: '#2563eb',
+      chipInk: '#ffffff',
+    };
+  }
+
+  const darkBg1 = `rgb(${Math.max(8, Math.round(r * 0.14))}, ${Math.max(8, Math.round(g * 0.14))}, ${Math.max(12, Math.round(b * 0.14))})`;
+  const darkBg2 = '#05070a';
+
+  return {
+    id: `custom_${cleanHex.slice(1)}`,
+    name: `Custom (${cleanHex})`,
+    light: false,
+    bg1: darkBg1,
+    bg2: darkBg2,
+    ink: '#f9fafb',
+    sub: '#d1d5db',
+    accent: cleanHex,
+    accent2: '#f59e0b',
+    chipInk: darkBg1,
+  };
+}
 
 export const POSTER_LAYOUTS = ['festival', 'editorial', 'modern', 'offer', 'rangoli'] as const;
 export type PosterLayout = (typeof POSTER_LAYOUTS)[number];
@@ -75,6 +127,10 @@ export interface PosterSpec {
 const M = 72;
 
 function palette(id: string): Palette {
+  if (id.startsWith('custom_')) {
+    const hex = `#${id.slice(7)}`;
+    return createCustomPalette(hex);
+  }
   return PALETTES.find((p) => p.id === id) ?? PALETTES[0];
 }
 

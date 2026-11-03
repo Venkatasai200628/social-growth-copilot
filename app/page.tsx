@@ -90,19 +90,6 @@ function PhoneMockup() {
           </div>
         </div>
       </div>
-      {/* Floating badges */}
-      <div className="absolute -top-3 -right-4 bg-[var(--card)] border border-[var(--border)] rounded-2xl px-3 py-2 text-xs shadow-xl flex items-center gap-1.5">
-        <span className="text-[var(--success)]">✓</span> Caption ready
-      </div>
-      <div className="absolute bottom-8 -left-6 bg-[var(--card)] border border-[var(--border)] rounded-2xl px-3 py-2 text-xs shadow-xl flex items-center gap-1.5">
-        <Mic size={11} className="text-[var(--accent-soft)]" /> Voice input
-      </div>
-      <div className="absolute -top-4 -left-4 hidden sm:flex items-center gap-1.5 bg-[var(--card)] border border-[#25d366]/30 text-[#25d366] rounded-2xl px-3 py-1.5 text-xs shadow-xl animate-float" style={{ animationDelay: '0.6s' }}>
-        <div className="w-1.5 h-1.5 rounded-full bg-[#25d366]" /> WhatsApp Flow
-      </div>
-      <div className="absolute -bottom-3 -right-2 hidden sm:flex items-center gap-1.5 bg-[var(--card)] border border-[#e1306c]/30 text-[#e1306c] rounded-2xl px-3 py-1.5 text-xs shadow-xl animate-float" style={{ animationDelay: '1.2s' }}>
-        <div className="w-1.5 h-1.5 rounded-full bg-[#e1306c]" /> Instagram Ready
-      </div>
     </div>
   );
 }
@@ -154,6 +141,12 @@ export default function LandingPage() {
   const router = useRouter();
   const { user } = useAuth();
 
+  useEffect(() => {
+    if (user) {
+      router.replace('/home');
+    }
+  }, [user, router]);
+
   return (
     <main className="min-h-screen relative overflow-hidden">
       <div className="orb w-[800px] h-[800px] bg-[var(--accent)]/10 top-[-300px] right-[-200px]" />
@@ -168,16 +161,6 @@ export default function LandingPage() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left: text */}
           <div className="animate-slide-left">
-            {/* Live badge */}
-            <div className="inline-flex items-center gap-2 mb-5 px-4 py-2 rounded-full text-xs border"
-              style={{ background: 'color-mix(in srgb, var(--success) 10%, transparent)', borderColor: 'color-mix(in srgb, var(--success) 25%, transparent)', color: 'var(--success)' }}>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping-small absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]" />
-              </span>
-              Live in India — 10,000+ business owners and growing
-            </div>
-
             <div className="inline-flex items-center gap-2 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-full px-5 py-2 text-xs text-[var(--accent-soft)] mb-6 tracking-widest uppercase">
               <Sparkles size={11} /> Your AI marketing mitra
             </div>
@@ -198,10 +181,10 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-wrap items-center gap-4">
-              <button onClick={() => router.push(user ? '/onboard' : '/auth')}
+              <button onClick={() => router.push(user ? '/home' : '/auth')}
                 className="flex items-center gap-2 px-8 py-4 rounded-full text-white text-sm tracking-wide hover:opacity-90 transition-all hover:-translate-y-0.5 shadow-lg shadow-[var(--accent)]/25"
                 style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-soft))' }}>
-                <Zap size={14} /> Start Growing
+                <Zap size={14} /> {user ? 'Go to Dashboard' : 'Open Dashboard'}
               </button>
               <button onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })}
                 className="flex items-center gap-2 px-8 py-4 rounded-full text-[var(--text-muted)] text-sm border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--text)] transition-all">
