@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Zap, ImageIcon, Film, MessageCircle, TrendingUp, Edit3, Calendar,
-  ArrowRight, Plus, Sparkles, HelpCircle, Star, Trophy, ShieldCheck, Activity, Wand2,
+  ArrowRight, Plus, Sparkles, HelpCircle, Star, Trophy, ShieldCheck, Activity,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import AuthGuard from '../components/AuthGuard';
@@ -139,9 +139,8 @@ function HomeInner() {
   }, [user]);
 
   const quickActions = [
-    { href: '/visual-studio', icon: Wand2, label: 'Visual Studio', desc: 'AI brand ambassadors, studio visuals & macros', color: 'var(--accent-soft)' },
-    { href: '/post-studio', icon: ImageIcon, label: 'Create a Post', desc: 'Photo → poster, caption & WhatsApp message', color: 'var(--accent-soft)' },
     { href: '/video-studio', icon: Film, label: 'Make a Video', desc: 'Script, scenes & AI voiceover reel', color: 'var(--neon)' },
+    { href: '/post-studio', icon: ImageIcon, label: 'Create a Post', desc: 'Photo → poster, caption & WhatsApp message', color: 'var(--accent-soft)' },
     { href: '/onboard', icon: Plus, label: 'New Campaign', desc: 'Multi-day plan with daily tracking', color: 'var(--success)' },
     { href: '/reply-agent', icon: MessageCircle, label: 'Reply Assistant', desc: 'Paste a customer DM, get English replies', color: '#25d366' },
   ];

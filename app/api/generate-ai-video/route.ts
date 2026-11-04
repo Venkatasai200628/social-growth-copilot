@@ -35,9 +35,10 @@ export async function POST(req: NextRequest) {
 
     const startTime = Date.now();
 
-    // Call Lightricks LTX-Video for rapid, high-quality image-to-video diffusion
+    // Call Lightricks LTX-Video with explicit version identifier
+    const LTX_VERSION = 'lightricks/ltx-video:8c47da666861d081eeb4d1261853087de23923a268a69b63febdf5dc1dee08e4' as const;
     const output = await replicate.run(
-      'lightricks/ltx-video',
+      LTX_VERSION,
       {
         input: {
           image: body.image,
@@ -78,7 +79,30 @@ export async function POST(req: NextRequest) {
       model: 'lightricks/ltx-video',
       status: 'completed',
     });
-  } catch (err) {
+  } catch (err: unknown) {
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error('[generate-ai-video] Replicate execution error:', rawMsg);
+
+    if (rawMsg.includes('402') || rawMsg.toLowerCase().includes('insufficient credit') || rawMsg.toLowerCase().includes('billing')) {
+      return NextResponse.json(
+        {
+          error: 'Replicate API account has $0 balance / insufficient credit. Please add credit at replicate.com/account/billing or use the free Instant Kinetic Reel engine!',
+          code: 'INSUFFICIENT_CREDIT',
+        },
+        { status: 402 }
+      );
+    }
+
+    if (rawMsg.includes('401') || rawMsg.toLowerCase().includes('unauthenticated') || rawMsg.toLowerCase().includes('invalid token')) {
+      return NextResponse.json(
+        {
+          error: 'Replicate API Token is invalid or expired. Please check your token in .env.local',
+          code: 'INVALID_TOKEN',
+        },
+        { status: 401 }
+      );
+    }
+
     return serverError('generate-ai-video', err);
   }
 }
