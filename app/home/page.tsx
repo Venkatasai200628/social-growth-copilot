@@ -29,6 +29,14 @@ interface PostHistoryItem {
   createdAt: number;
 }
 
+interface VideoHistoryItem {
+  id: string;
+  title: string;
+  videoUrl: string;
+  type: string;
+  createdAt: number;
+}
+
 function greetingIST(): string {
   const ist = new Date(Date.now() + (5.5 * 60 - new Date().getTimezoneOffset()) * 60000);
   const h = new Date(ist).getUTCHours();
@@ -61,6 +69,7 @@ function HomeInner() {
   const [campaigns, setCampaigns] = useState<RecentCampaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [postHistory, setPostHistory] = useState<PostHistoryItem[]>([]);
+  const [videoHistory, setVideoHistory] = useState<VideoHistoryItem[]>([]);
   const [festivalStrip, setFestivalStrip] = useState<{ name: string; daysUntil: number; id: string } | null>(null);
 
   useEffect(() => {
@@ -68,6 +77,12 @@ function HomeInner() {
     try {
       const raw = localStorage.getItem('growmitra_post_history');
       if (raw) setPostHistory(JSON.parse(raw).slice(0, 3));
+    } catch { /* ignore */ }
+
+    // Load video history from localStorage
+    try {
+      const rawVid = localStorage.getItem('gm_video_history');
+      if (rawVid) setVideoHistory(JSON.parse(rawVid).slice(0, 3));
     } catch { /* ignore */ }
 
     // Compute festival strip
@@ -281,6 +296,58 @@ function HomeInner() {
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-1">{p.caption}</p>
                   </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent AI Videos & Reels */}
+        <div className="mt-12">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-widest">Recent AI Videos &amp; Reels</h2>
+              <p className="text-[10px] text-[var(--text-faint)] mt-0.5">Videos generated in Video Studio</p>
+            </div>
+            <button onClick={() => router.push('/video-generator')}
+              className="text-xs text-[var(--neon)] hover:underline inline-flex items-center gap-1">
+              Video Generator <ArrowRight size={11} />
+            </button>
+          </div>
+          {videoHistory.length === 0 ? (
+            <Card className="p-7 text-center">
+              <div className="w-10 h-10 rounded-2xl bg-[color-mix(in_srgb,var(--neon)_10%,transparent)] border border-[color-mix(in_srgb,var(--neon)_20%,transparent)] flex items-center justify-center mx-auto mb-3">
+                <Film size={16} className="text-[var(--neon)]" />
+              </div>
+              <p className="text-[var(--text-muted)] text-sm mb-4">No videos generated yet — your rendered reels and AI videos appear here.</p>
+              <Button onClick={() => router.push('/video-generator')} variant="ghost" size="sm"><Zap size={13} /> Create your first video reel</Button>
+            </Card>
+          ) : (
+            <div className="space-y-2.5">
+              {videoHistory.map((v) => (
+                <button key={v.id} onClick={() => {
+                  try {
+                    sessionStorage.setItem('gm_ai_video_url', v.videoUrl);
+                  } catch {}
+                  router.push('/video-generator');
+                }}
+                  className="w-full text-left bg-[var(--card)] border border-[var(--border)] rounded-2xl px-5 py-4 hover:border-[color-mix(in_srgb,var(--neon)_40%,transparent)] transition-all flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-[color-mix(in_srgb,var(--neon)_12%,transparent)] border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Film size={13} className="text-[var(--neon)]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-[var(--text)] truncate">{v.title}</span>
+                      <span className="text-[10px] text-[var(--text-faint)] flex-shrink-0">{timeAgo(v.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-alt)] border border-[var(--border)] text-[var(--neon)]">
+                        {v.type === 'generative' ? '🎬 Generative AI (Replicate)' : '⚡ Instant Kinetic Reel'}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)]">Saved in Studio</span>
+                    </div>
+                  </div>
+                  <ArrowRight size={14} className="text-[var(--text-faint)] flex-shrink-0 mt-2" />
                 </button>
               ))}
             </div>
