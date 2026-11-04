@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Film, ChevronDown, Sparkles, AlertCircle, RefreshCw, Download, Clock, Music, Camera,
   Fish, Target, Mic, PenLine, Image as ImageIcon, Clapperboard, Scissors, Megaphone,
-  Edit3, Check, Palette, Layers, Layout, Monitor, CheckCircle2, Wand2, Plus, Trash2, ArrowRight } from 'lucide-react';
+  Edit3, Check, Palette, Layers, Layout, Monitor, CheckCircle2, Wand2, Plus, Trash2, Zap } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card, Field, inputCls, CopyButton, Skeleton, Tabs, PageHeader, EmptyState } from '../components/ui';
@@ -47,7 +46,6 @@ interface VideoScript {
 type TabKey = 'script' | 'scenes' | 'caption' | 'production';
 
 function VideoStudioInner() {
-  const router = useRouter();
   const toast = useToast();
   const [form, setForm] = useState({
     businessName: '', category: '', productDescription: '',
@@ -79,6 +77,19 @@ function VideoStudioInner() {
   const [videoBusy, setVideoBusy] = useState(false);
   const [videoPct, setVideoPct] = useState(0);
   const [videoError, setVideoError] = useState('');
+
+  // Dual-Engine Video Studio (Kinetic Reel vs Generative AI Video)
+  const [videoMode, setVideoMode] = useState<'kinetic' | 'generative'>('kinetic');
+  const [aiVideoUrl, setAiVideoUrl] = useState<string | null>(null);
+  const [aiVideoBusy, setAiVideoBusy] = useState(false);
+  const [aiVideoError, setAiVideoError] = useState('');
+
+  // Unified Photo Studio State (Upload vs Direct AI Generation)
+  const [photoSourceTab, setPhotoSourceTab] = useState<'upload' | 'ai_generate'>('upload');
+  const [aiConceptPrompt, setAiConceptPrompt] = useState('');
+  const [aiConceptStyle, setAiConceptStyle] = useState<'ai_presenter' | 'product_macro' | 'festival_mood'>('ai_presenter');
+  const [aiConceptBusy, setAiConceptBusy] = useState(false);
+
   // owner's own photos — kept across generations on purpose
   const [photos, setPhotos] = useState<string[]>([]);
   // AI voiceover options for the promo video
@@ -92,6 +103,73 @@ function VideoStudioInner() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingHook, setEditingHook] = useState(false);
   const [editingSceneIdx, setEditingSceneIdx] = useState<number | null>(null);
+
+  // 1-Click AI Photo & Presenter Generator inside Video Studio
+  const generateAiConceptPhoto = async () => {
+    const promptInput = aiConceptPrompt.trim() || form.productDescription.trim() || 'Festive commercial collection';
+    setAiConceptBusy(true);
+    try {
+      let fullPrompt = '';
+      if (aiConceptStyle === 'ai_presenter') {
+        fullPrompt = `Vertical 9:16 portrait of an attractive charismatic Indian brand ambassador creator smiling warmly, presenting ${promptInput}, ${form.category || 'Retail'} context, modern luxury studio, crisp facial details, cinematic lighting, photorealistic`;
+      } else if (aiConceptStyle === 'product_macro') {
+        fullPrompt = `Vertical 9:16 commercial advertisement hero macro still of ${promptInput}, ${form.category || 'Retail'} advertising, dramatic studio lighting, rich textures, pristine presentation, 8k photorealistic`;
+      } else {
+        fullPrompt = `Vertical 9:16 festive Indian celebration commercial photography of ${promptInput}, golden warm diya glow, celebration mood, 8k commercial quality`;
+      }
+
+      const res = await authFetch('/api/scene-image', {
+        prompt: fullPrompt,
+        aspect: selectedAspect,
+      });
+      const data = await res.json();
+      if (!data.imageDataUrl) {
+        throw new Error(data.error || 'Failed to generate visual');
+      }
+
+      setPhotos((prev) => [data.imageDataUrl, ...prev.slice(0, 3)]);
+      toast('AI visual generated and added to your video photos! 📸', 'ai');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not generate AI visual', 'error');
+    } finally {
+      setAiConceptBusy(false);
+    }
+  };
+
+  // Physical Generative AI Video using Replicate LTX-Video
+  const generateAiGenerativeVideo = async () => {
+    const targetImage = photos[0];
+    if (!targetImage) {
+      toast('Please upload or generate at least one photo first to bring it to life with AI video!', 'error');
+      return;
+    }
+
+    setAiVideoBusy(true);
+    setAiVideoError('');
+    setAiVideoUrl(null);
+    try {
+      const promptText = `Cinematic commercial camera pan, physical subject movement, photorealistic high quality ad of ${form.productDescription || 'product and presenter'}`;
+      const res = await authFetch('/api/generate-ai-video', {
+        image: targetImage,
+        prompt: promptText,
+        aspect: selectedAspect,
+      }, { method: 'POST' });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Generative video failed');
+      }
+
+      setAiVideoUrl(data.videoUrl);
+      toast('Generative AI Video completed with physical motion! 🎬', 'ai');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to generate AI video';
+      setAiVideoError(msg);
+      toast(msg, 'error');
+    } finally {
+      setAiVideoBusy(false);
+    }
+  };
 
   const addCustomScene = () => {
     if (!result) return;
@@ -275,40 +353,126 @@ function VideoStudioInner() {
                 onChange={(e) => setForm({ ...form, productDescription: e.target.value })} />
             </Field>
 
-            <div className="space-y-2">
-              <PhotoPicker photos={photos} onChange={setPhotos} max={6} />
-
-              {photos.length === 0 ? (
-                <div className="p-3.5 rounded-2xl bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-[var(--accent-soft)] flex items-center gap-1.5">
-                      <Wand2 size={13} /> Don&apos;t have product photos?
-                    </div>
-                    <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                      Generate AI brand ambassadors, commercial product macros & festival mood shots in Visual Studio.
-                    </p>
-                  </div>
-                  <Button
+            {/* Unified Photo Engine (Upload or Direct AI Visual Generation) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[var(--text)] uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon size={13} className="text-[var(--accent-soft)]" /> Product Photos & Visuals
+                </label>
+                <div className="flex items-center gap-1 bg-[var(--bg-alt)] border border-[var(--border)] rounded-xl p-0.5">
+                  <button
                     type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => router.push('/visual-studio')}
-                    className="shrink-0 text-xs text-[var(--accent-soft)] hover:bg-[color-mix(in_srgb,var(--accent)_15%,transparent)]"
+                    onClick={() => setPhotoSourceTab('upload')}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all ${
+                      photoSourceTab === 'upload'
+                        ? 'bg-[var(--accent)] text-white shadow-sm'
+                        : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                    }`}
                   >
-                    Visual Studio <ArrowRight size={12} className="ml-1" />
-                  </Button>
+                    Upload Photos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoSourceTab('ai_generate')}
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                      photoSourceTab === 'ai_generate'
+                        ? 'bg-[var(--accent)] text-white shadow-sm'
+                        : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                    }`}
+                  >
+                    <Wand2 size={10} /> Generate AI Visuals
+                  </button>
+                </div>
+              </div>
+
+              {photoSourceTab === 'upload' ? (
+                <div className="space-y-2">
+                  <PhotoPicker photos={photos} onChange={setPhotos} max={6} />
+                  {photos.length === 0 && (
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Tip: Don&apos;t have product photos? Click <strong>&ldquo;Generate AI Visuals&rdquo;</strong> above to create Indian brand ambassadors or commercial product macro stills instantly.
+                    </p>
+                  )}
                 </div>
               ) : (
+                <div className="p-4 rounded-2xl bg-[var(--bg-alt)] border border-[var(--border)] space-y-3">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { id: 'ai_presenter', label: 'Brand Ambassador' },
+                      { id: 'product_macro', label: 'Product Macro' },
+                      { id: 'festival_mood', label: 'Festive Mood' },
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setAiConceptStyle(s.id as 'ai_presenter' | 'product_macro' | 'festival_mood')}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                          aiConceptStyle === s.id
+                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
+                            : 'bg-[var(--card)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)]'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className={inputCls + ' text-xs py-2'}
+                      placeholder={form.productDescription ? `e.g. ${form.productDescription.slice(0, 45)}` : 'Describe the product or visual concept...'}
+                      value={aiConceptPrompt}
+                      onChange={(e) => setAiConceptPrompt(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={generateAiConceptPhoto}
+                      loading={aiConceptBusy}
+                      disabled={aiConceptBusy}
+                      className="shrink-0 text-xs"
+                    >
+                      <Sparkles size={12} className="mr-1" /> Generate
+                    </Button>
+                  </div>
+
+                  {photos.length > 0 && (
+                    <div className="pt-2 border-t border-[var(--border-soft)]">
+                      <div className="text-[11px] text-[var(--text-muted)] mb-2 flex items-center justify-between">
+                        <span>Active Video Photos ({photos.length})</span>
+                        <button
+                          type="button"
+                          onClick={() => setPhotos([])}
+                          className="text-[10px] text-[var(--danger)] hover:underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {photos.map((pUrl, i) => (
+                          <div key={i} className="w-14 h-14 rounded-xl border border-[var(--border)] overflow-hidden shrink-0 relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={pUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {photos.length > 0 && photoSourceTab === 'upload' && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-center justify-between">
                   <span className="flex items-center gap-1.5 font-medium">
-                    <CheckCircle2 size={13} /> {photos.length} photo{photos.length > 1 ? 's' : ''} uploaded. Video script will be generated for exactly {photos.length} matching scene{photos.length > 1 ? 's' : ''}.
+                    <CheckCircle2 size={13} /> {photos.length} photo{photos.length > 1 ? 's' : ''} active. Video script will be generated for exactly {photos.length} matching scene{photos.length > 1 ? 's' : ''}.
                   </span>
                   <button
                     type="button"
                     onClick={() => setPhotos([])}
                     className="text-[10px] text-[var(--text-muted)] hover:text-[var(--danger)] underline ml-2"
                   >
-                    Clear photos
+                    Clear
                   </button>
                 </div>
               )}
@@ -453,145 +617,284 @@ function VideoStudioInner() {
                     )}
                   </div>
 
-                  {/* Promo video maker */}
-                  <div className="mt-5 rounded-2xl border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] bg-[color-mix(in_srgb,var(--neon)_6%,transparent)] p-4">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                  {/* Dual-Engine Promo Video Studio */}
+                  <div className="mt-5 rounded-2xl border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] bg-[color-mix(in_srgb,var(--neon)_6%,transparent)] p-4 sm:p-5">
+                    {/* Engine Mode Switcher */}
+                    <div className="flex items-center justify-between gap-3 flex-wrap pb-3.5 border-b border-[var(--border)]">
                       <div>
-                        <div className="text-xs text-[var(--neon)] uppercase tracking-widest mb-1 flex items-center gap-1.5"><Clapperboard size={11} /> Promo Video</div>
+                        <div className="text-xs text-[var(--neon)] uppercase tracking-widest mb-1 flex items-center gap-1.5 font-bold">
+                          <Clapperboard size={13} /> Dual-Engine Video Maker
+                        </div>
                         <p className="text-xs text-[var(--text-muted)]">
-                          {photos.length > 0
-                            ? `Using your ${photos.length} uploaded photo${photos.length > 1 ? 's' : ''} with motion transitions, theme styling & synchronized voice.`
-                            : 'AI scene visuals with motion transitions, theme styling & synchronized voice.'}
+                          Choose between instant CapCut-grade kinetic typography reels or Replicate generative AI video with physical motion.
                         </p>
                       </div>
-                      <Button size="sm" onClick={makeVideo} disabled={videoBusy}>
-                        {videoBusy ? `Rendering ${Math.round(videoPct * 100)}%…` : <><Film size={13} /> Render Video 🎬</>}
-                      </Button>
-                    </div>
-
-                    {/* Controls grid: Format Style, Aspect Ratio, Theme, Transition & Voice */}
-                    <div className="mt-4 pt-3 border-t border-[var(--border)] grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                      {/* Format Style */}
-                      <div className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
-                          <Layout size={12} className="text-[var(--neon)]" /> Video Format
-                        </label>
-                        <div className="relative mt-1">
-                          <select
-                            aria-label="Video Format Style"
-                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                            value={selectedFormat}
-                            onChange={(e) => setSelectedFormat(e.target.value as VideoFormatStyle)}
-                          >
-                            {VIDEO_FORMAT_STYLES.map((fs) => (
-                              <option key={fs.id} value={fs.id}>{fs.name}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
-                        </div>
-                      </div>
-
-                      {/* Aspect Ratio */}
-                      <div className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
-                          <Monitor size={12} className="text-[var(--accent-soft)]" /> Dimensions
-                        </label>
-                        <div className="relative mt-1">
-                          <select
-                            aria-label="Aspect Ratio"
-                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                            value={selectedAspect}
-                            onChange={(e) => setSelectedAspect(e.target.value as AspectRatioType)}
-                          >
-                            {ASPECT_RATIOS.map((ar) => (
-                              <option key={ar.id} value={ar.id}>{ar.label}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
-                        </div>
-                      </div>
-
-                      {/* Theme / Palette */}
-                      <div className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
-                          <Palette size={12} className="text-[var(--gold)]" /> Design Theme
-                        </label>
-                        <div className="relative mt-1">
-                          <select
-                            aria-label="Design Theme"
-                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                            value={selectedTheme}
-                            onChange={(e) => setSelectedTheme(e.target.value)}
-                          >
-                            {VIDEO_THEMES.map((theme) => (
-                              <option key={theme.id} value={theme.id}>{theme.name}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
-                        </div>
-                      </div>
-
-                      {/* Scene Transitions & Voice */}
-                      <div className="space-y-1">
-                        <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
-                          <Layers size={12} className="text-[var(--accent-soft)]" /> Transitions
-                        </label>
-                        <div className="relative mt-1">
-                          <select
-                            aria-label="Scene Transition"
-                            className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                            value={selectedTransition}
-                            onChange={(e) => setSelectedTransition(e.target.value as TransitionType)}
-                          >
-                            {VIDEO_TRANSITIONS.map((tr) => (
-                              <option key={tr.id} value={tr.id}>{tr.name}</option>
-                            ))}
-                          </select>
-                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
-                        </div>
+                      <div className="inline-flex p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--border)]">
+                        <button
+                          type="button"
+                          onClick={() => setVideoMode('kinetic')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            videoMode === 'kinetic'
+                              ? 'bg-[var(--accent)] text-white shadow-sm'
+                              : 'text-[var(--text-soft)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          <Zap size={12} /> Instant Kinetic Reel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVideoMode('generative')}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            videoMode === 'generative'
+                              ? 'bg-[var(--accent)] text-white shadow-sm'
+                              : 'text-[var(--text-soft)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          <Wand2 size={12} /> AI Generative Video (Replicate)
+                        </button>
                       </div>
                     </div>
 
-                    {/* Secondary row: Voice narration options */}
-                    <div className="mt-3 pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
-                      <label className="flex items-center gap-2 text-xs text-[var(--text-soft)] cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={voiceOn}
-                          onChange={(e) => setVoiceOn(e.target.checked)}
-                          className="w-3.5 h-3.5 accent-[var(--neon)] cursor-pointer"
-                        />
-                        <Mic size={12} /> Synchronized AI narration
-                      </label>
-                      {voiceOn && (
-                        <div className="relative">
-                          <select
-                            aria-label="Voice"
-                            className="appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-full pl-3 pr-7 py-1 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
-                            value={voiceGender}
-                            onChange={(e) => setVoiceGender(e.target.value as 'female' | 'male')}
-                          >
-                            <option value="female">Female narration</option>
-                            <option value="male">Male narration</option>
-                          </select>
-                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                    {videoMode === 'kinetic' ? (
+                      /* Mode 1: Instant Kinetic Reel */
+                      <div className="mt-4 space-y-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <span className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                              ⚡ Kinetic Typographic Reel (CapCut-Grade)
+                            </span>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                              {photos.length > 0
+                                ? `Animating your ${photos.length} visual${photos.length > 1 ? 's' : ''} with atmospheric particle embers, kinetic karaoke typography & synchronized narration.`
+                                : 'Using AI visuals with kinetic typography, particle physics & synchronized narration.'}
+                            </p>
+                          </div>
+                          <Button size="sm" onClick={makeVideo} disabled={videoBusy}>
+                            {videoBusy ? `Rendering ${Math.round(videoPct * 100)}%…` : <><Film size={13} /> Render Kinetic Reel 🎬</>}
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                    {videoBusy && (
-                      <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden mt-3">
-                        <div className="h-full rounded-full bg-[var(--neon)] transition-all" style={{ width: `${videoPct * 100}%` }} />
+
+                        {/* Controls grid: Format Style, Aspect Ratio, Theme, Transition */}
+                        <div className="pt-3 border-t border-[var(--border)] grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          {/* Format Style */}
+                          <div className="space-y-1">
+                            <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
+                              <Layout size={12} className="text-[var(--neon)]" /> Video Format
+                            </label>
+                            <div className="relative mt-1">
+                              <select
+                                aria-label="Video Format Style"
+                                className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                                value={selectedFormat}
+                                onChange={(e) => setSelectedFormat(e.target.value as VideoFormatStyle)}
+                              >
+                                {VIDEO_FORMAT_STYLES.map((fs) => (
+                                  <option key={fs.id} value={fs.id}>{fs.name}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Aspect Ratio */}
+                          <div className="space-y-1">
+                            <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
+                              <Monitor size={12} className="text-[var(--accent-soft)]" /> Dimensions
+                            </label>
+                            <div className="relative mt-1">
+                              <select
+                                aria-label="Aspect Ratio"
+                                className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                                value={selectedAspect}
+                                onChange={(e) => setSelectedAspect(e.target.value as AspectRatioType)}
+                              >
+                                {ASPECT_RATIOS.map((ar) => (
+                                  <option key={ar.id} value={ar.id}>{ar.label}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Theme / Palette */}
+                          <div className="space-y-1">
+                            <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
+                              <Palette size={12} className="text-[var(--gold)]" /> Design Theme
+                            </label>
+                            <div className="relative mt-1">
+                              <select
+                                aria-label="Design Theme"
+                                className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                                value={selectedTheme}
+                                onChange={(e) => setSelectedTheme(e.target.value)}
+                              >
+                                {VIDEO_THEMES.map((theme) => (
+                                  <option key={theme.id} value={theme.id}>{theme.name}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Scene Transitions */}
+                          <div className="space-y-1">
+                            <label className="text-xs text-[var(--text-soft)] flex items-center gap-1.5 font-medium">
+                              <Layers size={12} className="text-[var(--accent-soft)]" /> Transitions
+                            </label>
+                            <div className="relative mt-1">
+                              <select
+                                aria-label="Scene Transition"
+                                className="w-full appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-3 pr-7 py-1.5 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                                value={selectedTransition}
+                                onChange={(e) => setSelectedTransition(e.target.value as TransitionType)}
+                              >
+                                {VIDEO_TRANSITIONS.map((tr) => (
+                                  <option key={tr.id} value={tr.id}>{tr.name}</option>
+                                ))}
+                              </select>
+                              <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Secondary row: Voice narration options */}
+                        <div className="pt-2 border-t border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
+                          <label className="flex items-center gap-2 text-xs text-[var(--text-soft)] cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={voiceOn}
+                              onChange={(e) => setVoiceOn(e.target.checked)}
+                              className="w-3.5 h-3.5 accent-[var(--neon)] cursor-pointer"
+                            />
+                            <Mic size={12} /> Synchronized AI narration
+                          </label>
+                          {voiceOn && (
+                            <div className="relative">
+                              <select
+                                aria-label="Voice"
+                                className="appearance-none bg-[var(--input-bg)] border border-[var(--input-border)] rounded-full pl-3 pr-7 py-1 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none cursor-pointer"
+                                value={voiceGender}
+                                onChange={(e) => setVoiceGender(e.target.value as 'female' | 'male')}
+                              >
+                                <option value="female">Female narration</option>
+                                <option value="male">Male narration</option>
+                              </select>
+                              <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
+                            </div>
+                          )}
+                        </div>
+
+                        {videoBusy && (
+                          <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden mt-3">
+                            <div className="h-full rounded-full bg-[var(--neon)] transition-all" style={{ width: `${videoPct * 100}%` }} />
+                          </div>
+                        )}
+                        {videoError && <p className="text-xs text-[var(--danger)] mt-2">{videoError}</p>}
+                        {video && !videoBusy && (
+                          <div className="mt-4 space-y-3 p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                            <video src={video.url} controls playsInline className="w-full max-w-[280px] mx-auto rounded-2xl border border-[var(--border)] shadow-lg" />
+                            <div className="flex items-center justify-center gap-2">
+                              <Button size="sm" onClick={() => downloadVideo(video.url, form.businessName || 'growmitra', video.mimeType)}>
+                                <Download size={13} /> Download Kinetic Video
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={makeVideo}><RefreshCw size={13} /> Re-render</Button>
+                            </div>
+                            <p className="text-[10px] text-center text-[var(--text-faint)]">{video.width}×{video.height} · {video.durationSec}s · {video.mimeType.includes('mp4') ? 'MP4' : 'WebM'}</p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {videoError && <p className="text-xs text-[var(--danger)] mt-2">{videoError}</p>}
-                    {video && !videoBusy && (
-                      <div className="mt-4 space-y-3">
-                        <video src={video.url} controls playsInline className="w-full max-w-[280px] mx-auto rounded-2xl border border-[var(--border)]" />
-                        <div className="flex items-center justify-center gap-2">
-                          <Button size="sm" onClick={() => downloadVideo(video.url, form.businessName || 'growmitra', video.mimeType)}><Download size={13} /> Download Video</Button>
-                          <Button size="sm" variant="ghost" onClick={makeVideo}><RefreshCw size={13} /> Re-render</Button>
+                    ) : (
+                      /* Mode 2: Replicate LTX Physical Generative Video */
+                      <div className="mt-4 space-y-4">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <span className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                              🎬 Physical Motion Generative Video (Replicate LTX-Video)
+                            </span>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                              Brings your primary visual to life with camera sweeps, realistic physical motion, and photorealistic motion physics.
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={generateAiGenerativeVideo}
+                            disabled={aiVideoBusy || photos.length === 0}
+                          >
+                            {aiVideoBusy ? (
+                              <><RefreshCw size={13} className="animate-spin" /> Generating LTX Video… (~25s)</>
+                            ) : (
+                              <><Film size={13} /> Generate Physical AI Video 🚀</>
+                            )}
+                          </Button>
                         </div>
-                        <p className="text-[10px] text-center text-[var(--text-faint)]">{video.width}×{video.height} · {video.durationSec}s · {video.mimeType.includes('mp4') ? 'MP4' : 'WebM'}</p>
+
+                        {photos.length === 0 ? (
+                          <div className="p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] text-xs text-[var(--text-soft)] flex items-center gap-2">
+                            <Sparkles size={14} className="text-[var(--accent)] shrink-0" />
+                            <span>Upload a photo or generate an AI visual above first to bring it to life as physical AI video.</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-xs">
+                            {/* thumbnail of the photo that will be animated */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={photos[0]} alt="Hero visual" className="w-12 h-16 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-[var(--text)] truncate">Animating: Primary Visual</p>
+                              <p className="text-[var(--text-muted)] text-[11px] truncate">
+                                Model: Lightricks LTX-Video (25 FPS, commercial camera pan & motion physics)
+                              </p>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[color-mix(in_srgb,var(--neon)_15%,transparent)] text-[var(--neon)] font-medium">
+                              Ready
+                            </span>
+                          </div>
+                        )}
+
+                        {aiVideoBusy && (
+                          <div className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--border)] text-center space-y-3">
+                            <div className="w-8 h-8 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin mx-auto" />
+                            <p className="text-xs font-medium text-[var(--text)]">Synthesizing physical motion with Replicate LTX-Video...</p>
+                            <p className="text-[11px] text-[var(--text-muted)]">
+                              Rendering neural diffusion frames at 25 fps. This usually takes around 20 to 30 seconds.
+                            </p>
+                          </div>
+                        )}
+
+                        {aiVideoError && (
+                          <div className="p-3 rounded-xl border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] text-xs text-[var(--danger)]">
+                            {aiVideoError}
+                          </div>
+                        )}
+
+                        {aiVideoUrl && !aiVideoBusy && (
+                          <div className="space-y-3 p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                            <video
+                              src={aiVideoUrl}
+                              controls
+                              playsInline
+                              autoPlay
+                              loop
+                              className="w-full max-w-[280px] mx-auto rounded-2xl border border-[var(--border)] shadow-xl"
+                            />
+                            <div className="flex items-center justify-center gap-2">
+                              <a
+                                href={aiVideoUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={`${(form.businessName || 'growmitra').toLowerCase().replace(/\s+/g, '_')}_ltx_video.mp4`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-95 shadow-md"
+                              >
+                                <Download size={13} /> Download Generative MP4
+                              </a>
+                              <Button size="sm" variant="ghost" onClick={generateAiGenerativeVideo}>
+                                <RefreshCw size={13} /> Re-generate
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-center text-[var(--text-faint)]">
+                              Generated with Replicate LTX-Video · 25 FPS · Full Generative Motion
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

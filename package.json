@@ -19,6 +19,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.3",
+    "replicate": "^1.4.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

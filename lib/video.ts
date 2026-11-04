@@ -195,6 +195,49 @@ function drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, alpha: 
   ctx.restore();
 }
 
+interface AmbientParticle {
+  x: number;
+  y: number;
+  size: number;
+  speed: number;
+  alpha: number;
+}
+
+const _particles: AmbientParticle[] = [];
+function getParticles(w: number, h: number): AmbientParticle[] {
+  if (_particles.length === 0) {
+    for (let i = 0; i < 30; i++) {
+      _particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        size: Math.random() * 3.5 + 1.5,
+        speed: Math.random() * 1.4 + 0.6,
+        alpha: Math.random() * 0.45 + 0.15,
+      });
+    }
+  }
+  return _particles;
+}
+
+function drawAtmosphericParticles(ctx: CanvasRenderingContext2D, w: number, h: number, accent: string) {
+  const pts = getParticles(w, h);
+  ctx.save();
+  for (const pt of pts) {
+    pt.y -= pt.speed;
+    if (pt.y < 0) {
+      pt.y = h;
+      pt.x = Math.random() * w;
+    }
+    ctx.fillStyle = accent;
+    ctx.globalAlpha = pt.alpha;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** CapCut-Grade Kinetic Typography & Subtitle Engine */
 function drawSceneText(
   ctx: CanvasRenderingContext2D,
   p: ReturnType<typeof paletteOf>,
@@ -202,38 +245,65 @@ function drawSceneText(
   subtitle: string | undefined,
   progress: number
 ) {
-  // bottom scrim so text always reads over any image
-  const scrim = ctx.createLinearGradient(0, H * 0.55, 0, H);
+  // 1. Cinematic gradient scrim for maximum text legibility
+  const scrim = ctx.createLinearGradient(0, H * 0.50, 0, H);
   scrim.addColorStop(0, 'rgba(0,0,0,0)');
-  scrim.addColorStop(1, 'rgba(0,0,0,0.78)');
+  scrim.addColorStop(0.25, 'rgba(0,0,0,0.52)');
+  scrim.addColorStop(1, 'rgba(0,0,0,0.92)');
   ctx.fillStyle = scrim;
-  ctx.fillRect(0, H * 0.55, W, H * 0.45);
+  ctx.fillRect(0, H * 0.50, W, H * 0.50);
 
-  const slide = (1 - progress) * 80; // text slides up and fades in
-  const alpha = Math.min(1, progress * 2.2);
+  // 2. Kinetic snap-in slide and alpha
+  const easeProgress = Math.min(1, progress * 1.8);
+  const slide = (1 - easeProgress) * 45;
+  const alpha = Math.min(1, progress * 3.0);
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  // accent tick
-  ctx.fillStyle = p.accent;
-  ctx.fillRect(90, H - 560 + slide, 120, 10);
 
-  let size = 92;
+  // 3. Highlight Category / Story Badge
+  const badgeY = H - 565 + slide;
+  ctx.fillStyle = `${p.accent}33`;
+  drawRoundRect(ctx, 90, badgeY - 34, 185, 34, 17);
+  ctx.fill();
+  ctx.strokeStyle = p.accent;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.font = `800 16px ${DISPLAY}`;
+  ctx.fillStyle = p.accent;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('EXCLUSIVE HIGHLIGHT', 182, badgeY - 17);
+  ctx.textAlign = 'left';
+
+  // 4. Kinetic Main Title with Drop Shadow
+  let size = 88;
   ctx.font = `900 ${size}px ${DISPLAY}`;
-  while (ctx.measureText(title).width > W - 180 && size > 44) {
+  while (ctx.measureText(title).width > W - 180 && size > 40) {
     size -= 4;
     ctx.font = `900 ${size}px ${DISPLAY}`;
   }
   const titleLines = wrap(ctx, title, W - 180, 3);
-  ctx.fillStyle = '#ffffff';
   ctx.textBaseline = 'top';
-  titleLines.forEach((l, i) => ctx.fillText(l, 90, H - 520 + slide + i * (size * 1.12)));
 
+  titleLines.forEach((l, i) => {
+    const lineY = H - 515 + slide + i * (size * 1.14);
+    // Crisp drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(l, 90, lineY);
+  });
+  ctx.shadowBlur = 0; // reset shadow
+
+  // 5. Spoken Narration Subtitle with glowing backdrop
   if (subtitle) {
-    const subY = H - 520 + slide + titleLines.length * (size * 1.12) + 26;
-    ctx.font = `600 44px ${INDIC}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.88)';
-    wrap(ctx, subtitle, W - 200, 2).forEach((l, i) => ctx.fillText(l, 90, subY + i * 60));
+    const subY = H - 515 + slide + titleLines.length * (size * 1.14) + 26;
+    ctx.font = `600 42px ${INDIC}`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
+    wrap(ctx, subtitle, W - 200, 2).forEach((l, i) => ctx.fillText(l, 90, subY + i * 58));
   }
   ctx.restore();
 }
@@ -640,7 +710,12 @@ export async function renderPromoVideo(
           // 3. Central Framed Showcase Card (images stay complete without getting cropped)
           drawShowcaseCard(ctx, img, W, H, p, localProgress, isWhiteboard);
 
-          // 4. Kinetic Typography (Scene Title)
+          // 4. Atmospheric particle embers for rich cinematic depth
+          if (!isWhiteboard) {
+            drawAtmosphericParticles(ctx, W, H, p.accent);
+          }
+
+          // 5. Kinetic Typography (Scene Title)
           const titleY = H > 1400 ? H * 0.58 : H * 0.60;
           const slide = (1 - Math.min(1, localProgress * 2.2)) * 40;
           const titleAlpha = Math.min(1, localProgress * 2.2);
