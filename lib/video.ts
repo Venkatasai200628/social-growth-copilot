@@ -22,6 +22,8 @@ export interface VideoScene {
   title: string;
   /** Smaller supporting line. */
   subtitle?: string;
+  /** Specific image data URL or link assigned to this exact scene */
+  imageDataUrl?: string;
 }
 
 /** AI narration mixed into the video's audio track. */
@@ -542,16 +544,21 @@ export async function renderPromoVideo(
   const images = await Promise.all(
     spec.scenes.map(async (s, i) => {
       try {
-        // If the user has photos (uploaded or AI generated), cycle them across all scenes so EVERY scene has a visual!
+        // 1. Scene's own dedicated visual generated specifically for this scene context
+        if (s.imageDataUrl && (s.imageDataUrl.startsWith('data:image') || s.imageDataUrl.startsWith('http') || s.imageDataUrl.startsWith('/'))) {
+          return await loadImage(s.imageDataUrl);
+        }
+        // 2. If the user has photos (uploaded or AI generated), cycle them across scenes
         if (spec.photos && spec.photos.length > 0) {
           const photo = spec.photos[i % spec.photos.length];
           if (photo && (photo.startsWith('data:image') || photo.startsWith('http') || photo.startsWith('/'))) {
             return await loadImage(photo);
           }
         }
+        // 3. Fallback to imagePrompt
         if (s.imagePrompt) {
           const dl = await fetchSceneImage(s.imagePrompt);
-          if (dl) return await loadImage(dl); // dataURL — loads instantly
+          if (dl) return await loadImage(dl);
         }
         return null; // → animated gradient scene
       } catch {

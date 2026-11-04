@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Film, ArrowLeft, Download, RefreshCw, Sparkles, Upload, Wand2, Mic,
   Monitor, AlertCircle, Zap, Clapperboard,
-  CheckCircle2, Trash2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2
+  CheckCircle2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2
 } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
@@ -24,6 +24,8 @@ interface Scene {
   voiceover: string;
   text_overlay: string;
   music_mood: string;
+  image?: string;
+  generating?: boolean;
 }
 
 interface VideoScript {
@@ -37,13 +39,68 @@ interface VideoScript {
   cta: string;
 }
 
+/**
+ * Intelligent contextual visual prompt generator.
+ * Inspects each scene's visual cue and shot type:
+ * - If presenter / face is mentioned -> generates charismatic Indian creator portrait.
+ * - If texture / application / drops / hands are mentioned -> generates macro application action still.
+ * - If product / macro / bottle / food / jewellery -> generates PRISTINE product photography with NO human face.
+ */
+function buildContextualScenePrompt(scene: Scene, productDesc: string, category: string): string {
+  const visualText = (scene.visual || '').toLowerCase();
+  const shotType = (scene.shot_type || '').toLowerCase();
+
+  const isHumanPresenter =
+    visualText.includes('face') ||
+    visualText.includes('owner') ||
+    visualText.includes('creator') ||
+    visualText.includes('smiling') ||
+    visualText.includes('speaking') ||
+    visualText.includes('person') ||
+    visualText.includes('ambassador') ||
+    visualText.includes('presenter') ||
+    visualText.includes('woman') ||
+    visualText.includes('man') ||
+    shotType.includes('talking head') ||
+    shotType.includes('presenter');
+
+  const isActionOrTexture =
+    visualText.includes('hand') ||
+    visualText.includes('drop') ||
+    visualText.includes('apply') ||
+    visualText.includes('pour') ||
+    visualText.includes('texture') ||
+    visualText.includes('liquid') ||
+    visualText.includes('touch') ||
+    visualText.includes('fingertip') ||
+    visualText.includes('open') ||
+    shotType.includes('demonstration') ||
+    shotType.includes('over-the-shoulder');
+
+  if (isHumanPresenter) {
+    return `Vertical 9:16 portrait of a charismatic Indian brand creator in a modern luxury studio, smiling warmly, presenting ${productDesc || scene.visual}, ${category || 'Retail'} commercial context, crisp facial details, natural cinematic lighting, 8k photorealistic`;
+  }
+
+  if (isActionOrTexture) {
+    return `Vertical 9:16 commercial macro action shot of ${scene.visual}, ${productDesc}, ${category || 'Retail'} commercial advertising, rich textures and droplets, beautiful studio lighting, aesthetic composition, pristine 8k commercial quality, no full human face`;
+  }
+
+  // Pure product showcase / packaging / macro / still (NO human faces when not requested!)
+  return `Vertical 9:16 commercial hero advertisement still of ${scene.visual}, ${productDesc}, ${category || 'Retail'} packaging and presentation, dramatic luxury studio lighting, rich textures, 8k commercial product photography, pristine product focus, no human face`;
+}
+
 function VideoGeneratorInner() {
   const toast = useToast();
 
   const [scriptData, setScriptData] = useState<VideoScript | null>(null);
+  const [scenes, setScenes] = useState<Scene[]>([]);
   const [businessName, setBusinessName] = useState('GrowMitra Brand');
   const [productDesc, setProductDesc] = useState('');
   const [category, setCategory] = useState('');
+
+  // 1-Click AI Full Workflow Batch State
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchStep, setBatchStep] = useState(0);
 
   // Video Engine Mode
   const [videoMode, setVideoMode] = useState<'kinetic' | 'generative'>('kinetic');
@@ -66,13 +123,6 @@ function VideoGeneratorInner() {
   const [videoDuration, setVideoDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
 
-  // Visuals State (Uploads + AI generation)
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [photoSourceTab, setPhotoSourceTab] = useState<'upload' | 'ai_generate'>('ai_generate');
-  const [aiConceptPrompt, setAiConceptPrompt] = useState('');
-  const [aiConceptStyle, setAiConceptStyle] = useState<'ai_presenter' | 'product_macro' | 'festival_mood'>('ai_presenter');
-  const [aiConceptBusy, setAiConceptBusy] = useState(false);
-
   // Video controls
   const [selectedFormat, setSelectedFormat] = useState<VideoFormatStyle>('motionExplainer');
   const [selectedAspect, setSelectedAspect] = useState<AspectRatioType>('9:16');
@@ -84,8 +134,58 @@ function VideoGeneratorInner() {
   // Load script and form from previous step
   useEffect(() => {
     try {
-      const savedScript = JSON.parse(sessionStorage.getItem('gm_video_result') || 'null');
-      if (savedScript) setScriptData(savedScript);
+      const savedScript: VideoScript | null = JSON.parse(sessionStorage.getItem('gm_video_result') || 'null');
+      const savedImages: (string | undefined)[] = JSON.parse(sessionStorage.getItem('gm_scene_images') || '[]');
+
+      if (savedScript && savedScript.scenes && savedScript.scenes.length > 0) {
+        setScriptData(savedScript);
+        setScenes(
+          savedScript.scenes.map((sc, i) => ({
+            ...sc,
+            image: savedImages[i] || sc.image || undefined,
+          }))
+        );
+      } else {
+        // Fallback default commercial storyboard
+        setScenes([
+          {
+            scene_number: 1,
+            duration_seconds: 4,
+            shot_type: 'Opening Hook & Face',
+            visual: 'Camera fixed on owner face smiling holding product',
+            voiceover: 'Tired of dull skin and dark spots?',
+            text_overlay: 'Dull Skin? Dark Spots?',
+            music_mood: 'Upbeat',
+          },
+          {
+            scene_number: 2,
+            duration_seconds: 5,
+            shot_type: 'Product Macro',
+            visual: 'Amber serum bottle with saffron glistening in studio light',
+            voiceover: 'Meet 10% Kumkumadi Radiance Face Serum, packed with saffron & sandalwood.',
+            text_overlay: '10% Kumkumadi Radiance',
+            music_mood: 'Upbeat',
+          },
+          {
+            scene_number: 3,
+            duration_seconds: 5,
+            shot_type: 'Demonstration & Application',
+            visual: 'Applying a few drops on fingertips onto cheek in soft focus',
+            voiceover: 'Apply a few drops daily morning and night on clean skin.',
+            text_overlay: 'Apply Daily AM & PM',
+            music_mood: 'Upbeat',
+          },
+          {
+            scene_number: 4,
+            duration_seconds: 5,
+            shot_type: 'Results & Call to Action',
+            visual: 'Radiant glowing skin in natural sunlight with product',
+            voiceover: 'In just 7 days, get that 24-hour glass skin glow. Order today!',
+            text_overlay: '7-Day Glass Skin Glow',
+            music_mood: 'Upbeat',
+          },
+        ]);
+      }
 
       const savedForm = JSON.parse(sessionStorage.getItem('gm_video_form') || 'null');
       if (savedForm) {
@@ -93,59 +193,34 @@ function VideoGeneratorInner() {
         if (savedForm.productDescription) setProductDesc(savedForm.productDescription);
         if (savedForm.category) setCategory(savedForm.category);
       }
-
-      const savedPhotos = JSON.parse(sessionStorage.getItem('gm_video_photos') || '[]');
-      if (Array.isArray(savedPhotos) && savedPhotos.length > 0) {
-        setPhotos(savedPhotos);
-      }
     } catch {
       /* ignore */
     }
   }, []);
 
-  // Save photos whenever updated
-  const updatePhotos = (newPhotos: string[]) => {
-    setPhotos(newPhotos);
+  // Save scene images to sessionStorage
+  const saveSceneImages = (updatedScenes: Scene[]) => {
     try {
-      sessionStorage.setItem('gm_video_photos', JSON.stringify(newPhotos));
+      const imagesArr = updatedScenes.map((s) => s.image);
+      sessionStorage.setItem('gm_scene_images', JSON.stringify(imagesArr));
     } catch {
       /* quota */
     }
   };
 
-  // Upload local photos
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Generate visual for a single specific scene
+  const generateSceneVisual = async (sceneIndex: number) => {
+    const targetScene = scenes[sceneIndex];
+    if (!targetScene) return;
 
-    Array.from(files).slice(0, 4).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          updatePhotos([reader.result, ...photos.slice(0, 3)]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    toast('Photo added to video timeline!', 'ai');
-  };
+    setScenes((prev) =>
+      prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: true } : s))
+    );
 
-  // 1-Click AI Visual Generator
-  const generateAiVisual = async () => {
-    const promptInput = aiConceptPrompt.trim() || productDesc.trim() || 'Festive Indian commercial showcase';
-    setAiConceptBusy(true);
     try {
-      let fullPrompt = '';
-      if (aiConceptStyle === 'ai_presenter') {
-        fullPrompt = `Vertical 9:16 portrait of an attractive charismatic Indian brand ambassador creator smiling warmly, presenting ${promptInput}, ${category || 'Retail'} commercial, modern luxury studio, crisp facial details, cinematic lighting, photorealistic`;
-      } else if (aiConceptStyle === 'product_macro') {
-        fullPrompt = `Vertical 9:16 commercial advertisement hero macro still of ${promptInput}, ${category || 'Retail'} advertising, dramatic studio lighting, rich textures, pristine presentation, 8k photorealistic`;
-      } else {
-        fullPrompt = `Vertical 9:16 festive Indian celebration commercial photography of ${promptInput}, golden warm diya glow, celebration mood, 8k commercial quality`;
-      }
-
+      const prompt = buildContextualScenePrompt(targetScene, productDesc, category);
       const res = await authFetch('/api/scene-image', {
-        prompt: fullPrompt,
+        prompt,
         aspect: selectedAspect,
       });
       const data = await res.json();
@@ -153,40 +228,67 @@ function VideoGeneratorInner() {
         throw new Error(data.error || 'Failed to generate visual');
       }
 
-      updatePhotos([data.imageDataUrl, ...photos.slice(0, 3)]);
-      toast('AI visual generated and added to your video! 📸', 'ai');
+      setScenes((prev) => {
+        const updated = prev.map((s, idx) =>
+          idx === sceneIndex ? { ...s, image: data.imageDataUrl, generating: false } : s
+        );
+        saveSceneImages(updated);
+        return updated;
+      });
+
+      toast(`Scene ${sceneIndex + 1} visual generated! 📸`, 'ai');
     } catch (err) {
+      setScenes((prev) =>
+        prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: false } : s))
+      );
       toast(err instanceof Error ? err.message : 'Could not generate visual', 'error');
-    } finally {
-      setAiConceptBusy(false);
     }
   };
 
-  // Render Instant Kinetic Reel (CapCut-grade)
+  // 1-Click AI Full Workflow: Generate All Scenes Sequentially
+  const generateAllSceneVisuals = async () => {
+    if (scenes.length === 0) return;
+    setBatchBusy(true);
+
+    for (let i = 0; i < scenes.length; i++) {
+      setBatchStep(i + 1);
+      await generateSceneVisual(i);
+    }
+
+    setBatchBusy(false);
+    toast('All scene visuals generated with contextual AI! 🎬', 'ai');
+  };
+
+  // Upload custom photo for a specific scene
+  const handleSceneFileUpload = (sceneIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        const dataUrl = reader.result;
+        setScenes((prev) => {
+          const updated = prev.map((s, idx) =>
+            idx === sceneIndex ? { ...s, image: dataUrl } : s
+          );
+          saveSceneImages(updated);
+          return updated;
+        });
+        toast(`Custom image assigned to Scene ${sceneIndex + 1}!`, 'ai');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Render Instant Kinetic Reel (CapCut-grade) using all scenes & their exact matching visuals
   const makeKineticVideo = async () => {
-    const sceneList: VideoScene[] = (scriptData?.scenes && scriptData.scenes.length > 0)
-      ? scriptData.scenes.map((s) => ({
-          title: s.text_overlay || s.shot_type || 'Special Offer',
-          subtitle: s.voiceover || s.visual || '',
-          imagePrompt: s.visual,
-        }))
-      : [
-          {
-            title: businessName,
-            subtitle: scriptData?.hook_line || 'Special offer just for you!',
-            imagePrompt: productDesc || 'Product Hero View',
-          },
-          {
-            title: 'Premium Quality',
-            subtitle: 'Handcrafted quality and premium design.',
-            imagePrompt: productDesc || 'Craft & Quality',
-          },
-          {
-            title: 'Visit Us Today',
-            subtitle: 'Visit our store or order online today!',
-            imagePrompt: 'Store and website offer details',
-          },
-        ];
+    const sceneList: VideoScene[] = scenes.map((s) => ({
+      title: s.text_overlay || s.shot_type || 'Special Offer',
+      subtitle: s.voiceover || s.visual || '',
+      imagePrompt: s.visual,
+      imageDataUrl: s.image,
+    }));
 
     setVideoBusy(true);
     setVideoError('');
@@ -197,7 +299,6 @@ function VideoGeneratorInner() {
           businessName,
           cta: scriptData?.cta || 'Order Now',
           scenes: sceneList,
-          photos: photos.length > 0 ? photos : undefined,
           voiceover: voiceOn
             ? {
                 text: (scriptData?.voiceover_script || scriptData?.hook_line || 'Experience the quality today.').slice(0, 500),
@@ -215,7 +316,7 @@ function VideoGeneratorInner() {
       );
       setVideo(res);
       setVideoDuration(res.durationSec);
-      toast('Kinetic Video Reel rendered successfully! 🎬', 'ai');
+      toast('Kinetic Video Reel rendered successfully with all scenes! 🎬', 'ai');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to render video';
       setVideoError(msg);
@@ -227,9 +328,9 @@ function VideoGeneratorInner() {
 
   // Generate Generative AI Video (Replicate)
   const makeGenerativeVideo = async () => {
-    const targetImage = photos[0];
+    const targetImage = scenes.find((s) => s.image)?.image;
     if (!targetImage) {
-      toast('Please upload or generate at least one photo first to bring it to life with AI video!', 'error');
+      toast('Please generate or upload at least one scene visual first!', 'error');
       return;
     }
 
@@ -313,6 +414,8 @@ function VideoGeneratorInner() {
     }
   };
 
+  const readyImagesCount = scenes.filter((s) => !!s.image).length;
+
   return (
     <main className="min-h-screen py-10 px-4 md:px-8 max-w-7xl mx-auto">
       {/* Top Navigation Bar */}
@@ -326,153 +429,138 @@ function VideoGeneratorInner() {
           </Link>
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-[var(--text)] flex items-center gap-2">
-              <Film className="text-[var(--neon)]" size={22} /> AI Video Production Studio
+              <Film className="text-[var(--neon)]" size={22} /> Full-Fledged AI Video Studio
             </h1>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Render your video reel with kinetic typography, custom theme palettes, or physical AI diffusion motion.
+              Scene-by-scene contextual visual generation matching your screenplay, themes, and animated typography.
             </p>
           </div>
         </div>
 
         {scriptData && (
           <div className="px-3 py-1.5 rounded-xl bg-[color-mix(in_srgb,var(--neon)_10%,transparent)] border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] text-xs text-[var(--neon)] max-w-md truncate">
-            🎬 Script: <span className="font-semibold text-[var(--text)]">{scriptData.title || businessName}</span>
+            🎬 Storyboard: <span className="font-semibold text-[var(--text)]">{scriptData.title || businessName} ({scenes.length} Scenes)</span>
           </div>
         )}
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Visuals & Engine Configuration (5 Cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Card 1: Visuals (Upload or AI Generation) */}
+        {/* Left Column: Visuals & Engine Configuration (6 Cols) */}
+        <div className="lg:col-span-6 space-y-6">
+          {/* Card 1: Full-Fledged Scene-by-Scene AI Visuals */}
           <Card className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs text-[var(--neon)] uppercase tracking-wider font-bold flex items-center gap-1.5">
-                <Camera size={13} /> Step 1: Video Visuals & Photos
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <div className="text-xs text-[var(--neon)] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                  <Camera size={13} /> Step 1: Scene-by-Scene Visual Storyboard
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                  {readyImagesCount} of {scenes.length} scene visuals generated
+                </p>
               </div>
-              <span className="text-[11px] text-[var(--text-muted)]">{photos.length}/4 visuals ready</span>
+
+              {/* 1-Click AI Full Workflow Button */}
+              <Button
+                size="sm"
+                onClick={generateAllSceneVisuals}
+                disabled={batchBusy}
+                className="shadow-md text-xs font-semibold"
+              >
+                {batchBusy ? (
+                  <><RefreshCw size={12} className="animate-spin" /> Generating Scene {batchStep}/{scenes.length}…</>
+                ) : (
+                  <><Wand2 size={13} /> 1-Click: Generate All {scenes.length} Visuals ✨</>
+                )}
+              </Button>
             </div>
 
-            {/* Visuals source tabs */}
-            <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] mb-4 text-xs">
-              <button
-                type="button"
-                onClick={() => setPhotoSourceTab('ai_generate')}
-                className={`py-1.5 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
-                  photoSourceTab === 'ai_generate'
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'text-[var(--text-soft)] hover:text-[var(--text)]'
-                }`}
-              >
-                <Wand2 size={12} /> Generate AI Visual
-              </button>
-              <button
-                type="button"
-                onClick={() => setPhotoSourceTab('upload')}
-                className={`py-1.5 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
-                  photoSourceTab === 'upload'
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'text-[var(--text-soft)] hover:text-[var(--text)]'
-                }`}
-              >
-                <Upload size={12} /> Upload Photos
-              </button>
+            {/* Context Notice */}
+            <div className="mb-4 p-2.5 rounded-xl bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] text-[11px] text-[var(--text-soft)]">
+              💡 <strong>Contextual Visual AI:</strong> Faces are generated only for talking-head scenes; product macros and action textures are generated with pure product focus.
             </div>
 
-            {photoSourceTab === 'ai_generate' ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setAiConceptStyle('ai_presenter')}
-                    className={`py-1.5 px-2 rounded-lg border text-center transition-all ${
-                      aiConceptStyle === 'ai_presenter'
-                        ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--text)] font-semibold'
-                        : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]'
-                    }`}
-                  >
-                    Ambassador
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAiConceptStyle('product_macro')}
-                    className={`py-1.5 px-2 rounded-lg border text-center transition-all ${
-                      aiConceptStyle === 'product_macro'
-                        ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--text)] font-semibold'
-                        : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]'
-                    }`}
-                  >
-                    Product Macro
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAiConceptStyle('festival_mood')}
-                    className={`py-1.5 px-2 rounded-lg border text-center transition-all ${
-                      aiConceptStyle === 'festival_mood'
-                        ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--text)] font-semibold'
-                        : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]'
-                    }`}
-                  >
-                    Festive Mood
-                  </button>
-                </div>
+            {/* Scene-by-Scene Visual Cards List */}
+            <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+              {scenes.map((scene, idx) => (
+                <div
+                  key={scene.scene_number || idx}
+                  className="p-3 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] flex items-start gap-3 transition-all hover:border-[var(--border-strong)]"
+                >
+                  {/* Thumbnail / Image Box */}
+                  <div className="relative w-16 h-24 rounded-lg overflow-hidden border border-[var(--border)] bg-black shrink-0 flex items-center justify-center">
+                    {scene.image ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={scene.image} alt={`Scene ${idx + 1}`} className="w-full h-full object-cover" />
+                    ) : scene.generating ? (
+                      <div className="flex flex-col items-center gap-1 text-[9px] text-[var(--neon)] font-mono">
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>AI...</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => generateSceneVisual(idx)}
+                        className="w-full h-full flex flex-col items-center justify-center p-1 text-[9px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-white/5 transition-colors"
+                      >
+                        <Wand2 size={12} className="mb-1 text-[var(--accent)]" />
+                        <span>Gen Visual</span>
+                      </button>
+                    )}
+                    <span className="absolute top-1 left-1 bg-black/75 text-[8px] px-1 py-0.5 rounded text-white font-mono">
+                      #{idx + 1}
+                    </span>
+                  </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={aiConceptPrompt}
-                    onChange={(e) => setAiConceptPrompt(e.target.value)}
-                    placeholder={productDesc || 'e.g. 22K royal gold bridal necklace with diyas'}
-                    className="flex-1 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-3 py-2 text-xs text-[var(--text)] focus:border-[var(--accent)] outline-none"
-                  />
-                  <Button size="sm" onClick={generateAiVisual} disabled={aiConceptBusy}>
-                    {aiConceptBusy ? <RefreshCw size={12} className="animate-spin" /> : <><Sparkles size={12} /> Generate</>}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <label className="border-2 border-dashed border-[var(--border)] hover:border-[var(--accent)] rounded-xl p-4 text-center cursor-pointer block transition-colors bg-[var(--input-bg)]">
-                <input type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
-                <Upload size={18} className="mx-auto text-[var(--text-muted)] mb-1" />
-                <p className="text-xs font-medium text-[var(--text)]">Click or drag photos here</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Upload up to 4 images for your video timeline</p>
-              </label>
-            )}
-
-            {/* Active photos strip */}
-            {photos.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-[var(--border)]">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-[var(--text-soft)] font-medium">
-                    Timeline Visuals ({photos.length} active — cycled across all scenes):
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => updatePhotos([])}
-                    className="text-[10px] text-[var(--danger)] hover:underline flex items-center gap-1"
-                  >
-                    <Trash2 size={10} /> Clear all
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {photos.map((src, i) => (
-                    <div key={i} className="relative group rounded-lg overflow-hidden border border-[var(--border)] aspect-[9/16] bg-black">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt={`Visual #${i + 1}`} className="w-full h-full object-cover" />
-                      <span className="absolute top-1 left-1 bg-black/70 text-[9px] px-1 py-0.5 rounded text-white font-mono">
-                        #{i + 1}
+                  {/* Scene Description & Actions */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <span className="text-[11px] font-bold text-[var(--text)] truncate">
+                        Scene {idx + 1}: {scene.shot_type || 'Commercial Shot'}
                       </span>
+                      <span className="text-[10px] text-[var(--text-faint)]">{scene.duration_seconds}s</span>
                     </div>
-                  ))}
+
+                    <p className="text-[10px] text-[var(--text-muted)] line-clamp-2 mt-0.5">
+                      <strong>Visual:</strong> {scene.visual}
+                    </p>
+
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-[var(--gold)] truncate">
+                      <span className="font-semibold">Overlay:</span> &ldquo;{scene.text_overlay}&rdquo;
+                    </div>
+
+                    {/* Scene Action Buttons */}
+                    <div className="mt-2 flex items-center gap-2 pt-1 border-t border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => generateSceneVisual(idx)}
+                        disabled={scene.generating || batchBusy}
+                        className="text-[10px] text-[var(--accent-soft)] hover:underline flex items-center gap-1 font-medium"
+                      >
+                        <RefreshCw size={10} className={scene.generating ? 'animate-spin' : ''} />
+                        {scene.image ? 'Re-roll AI' : 'Generate Visual'}
+                      </button>
+
+                      <label className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer flex items-center gap-1 ml-auto">
+                        <Upload size={10} />
+                        <span>Custom Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleSceneFileUpload(idx, e)}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </Card>
 
           {/* Card 2: Engine & Customization */}
           <Card className="p-5">
             <div className="text-xs text-[var(--neon)] uppercase tracking-wider font-bold flex items-center gap-1.5 mb-3">
-              <Clapperboard size={13} /> Step 2: Video Engine & Themes
+              <Clapperboard size={13} /> Step 2: Choose Video Engine & Theme
             </div>
 
             <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] mb-4 text-xs">
@@ -599,7 +687,7 @@ function VideoGeneratorInner() {
                       onChange={(e) => setVoiceOn(e.target.checked)}
                       className="w-3.5 h-3.5 accent-[var(--neon)]"
                     />
-                    <Mic size={12} /> AI Voiceover
+                    <Mic size={12} /> AI Voiceover Narration
                   </label>
                   {voiceOn && (
                     <select
@@ -613,45 +701,8 @@ function VideoGeneratorInner() {
                   )}
                 </div>
 
-                {/* 4. Scene Storyboard & Visuals Sync Preview */}
-                <div className="pt-2 border-t border-[var(--border)] space-y-2">
-                  <div className="flex items-center justify-between text-xs font-semibold text-[var(--text)]">
-                    <span className="flex items-center gap-1.5">
-                      <Clapperboard size={12} className="text-[var(--neon)]" /> Storyboard Text & Visuals Sync
-                    </span>
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      {scriptData?.scenes?.length || 3} scenes
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto pr-1">
-                    {((scriptData?.scenes && scriptData.scenes.length > 0) ? scriptData.scenes : [
-                      { scene_number: 1, text_overlay: businessName, voiceover: scriptData?.hook_line || 'Special Offer' },
-                      { scene_number: 2, text_overlay: 'Exclusive Quality', voiceover: 'Handcrafted quality and premium design.' },
-                      { scene_number: 3, text_overlay: 'Limited Time Offer', voiceover: 'Visit our store or order online today!' }
-                    ]).map((sc, i) => {
-                      const activePhoto = photos.length > 0 ? photos[i % photos.length] : null;
-                      return (
-                        <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-[var(--input-bg)] border border-[var(--border)]">
-                          {activePhoto ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={activePhoto} alt="" className="w-6 h-9 object-cover rounded border border-[var(--border)] shrink-0" />
-                          ) : (
-                            <div className="w-6 h-9 rounded bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-[9px] text-white/40">
-                              #{i + 1}
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold text-[var(--text)] truncate">Scene {i + 1}: {sc.text_overlay || 'Scene'}</p>
-                            <p className="text-[9px] text-[var(--text-muted)] truncate italic">&ldquo;{sc.voiceover}&rdquo;</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 <Button className="w-full mt-2" size="lg" onClick={makeKineticVideo} disabled={videoBusy}>
-                  {videoBusy ? `Rendering Reel ${Math.round(videoPct * 100)}%…` : <><Zap size={14} /> Render Kinetic Reel 🎬</>}
+                  {videoBusy ? `Rendering All ${scenes.length} Scenes (${Math.round(videoPct * 100)}%)…` : <><Zap size={14} /> Render All {scenes.length} Scenes into Video Reel 🎬</>}
                 </Button>
               </div>
             ) : (
@@ -660,17 +711,17 @@ function VideoGeneratorInner() {
                   🎬 <strong>Replicate LTX-Video neural diffusion</strong> generates physical camera sweep and subject motion from your first visual.
                 </p>
 
-                {photos.length === 0 ? (
+                {readyImagesCount === 0 ? (
                   <div className="p-3 rounded-xl bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] text-[11px] text-[var(--text-soft)] flex items-center gap-2">
                     <Sparkles size={14} className="text-[var(--accent)] shrink-0" />
-                    Please upload or generate at least one photo above first!
+                    Please generate at least one scene visual above to bring it to life as physical video!
                   </div>
                 ) : (
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photos[0]} alt="Hero visual" className="w-12 h-16 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+                    <img src={scenes.find((s) => !!s.image)?.image} alt="Hero visual" className="w-12 h-16 object-cover rounded-lg border border-[var(--border)] shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[var(--text)] truncate">Primary Visual Ready</p>
+                      <p className="font-semibold text-[var(--text)] truncate">Primary Scene Visual Ready</p>
                       <p className="text-[11px] text-[var(--text-muted)] truncate">Lightricks LTX-Video (25 FPS diffusion motion)</p>
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[10px] bg-[color-mix(in_srgb,var(--neon)_15%,transparent)] text-[var(--neon)] font-medium">Ready</span>
@@ -681,7 +732,7 @@ function VideoGeneratorInner() {
                   className="w-full mt-2"
                   size="lg"
                   onClick={makeGenerativeVideo}
-                  disabled={aiVideoBusy || photos.length === 0}
+                  disabled={aiVideoBusy || readyImagesCount === 0}
                 >
                   {aiVideoBusy ? (
                     <><RefreshCw size={14} className="animate-spin" /> Generating LTX Diffusion Video… (~25s)</>
@@ -694,8 +745,8 @@ function VideoGeneratorInner() {
           </Card>
         </div>
 
-        {/* Right Column: Dedicated Video Player & Download Center (7 Cols) */}
-        <div className="lg:col-span-7">
+        {/* Right Column: Dedicated Video Player & Download Center (6 Cols) */}
+        <div className="lg:col-span-6">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--border)]">
               <div className="text-xs text-[var(--neon)] uppercase tracking-wider font-bold flex items-center gap-1.5">
@@ -730,10 +781,10 @@ function VideoGeneratorInner() {
                 <div className="w-12 h-12 rounded-full border-3 border-[var(--accent)] border-t-transparent animate-spin mx-auto" />
                 <div>
                   <h3 className="text-base font-semibold text-[var(--text)]">
-                    {videoBusy ? 'Rendering CapCut-Grade Kinetic Typography Reel…' : 'Synthesizing Neural Diffusion Motion with LTX-Video…'}
+                    {videoBusy ? `Rendering All ${scenes.length} Scenes with Kinetic Typography…` : 'Synthesizing Neural Diffusion Motion with LTX-Video…'}
                   </h3>
                   <p className="text-xs text-[var(--text-muted)] mt-1">
-                    {videoBusy ? `Compositing particles, scenes & audio frames (${Math.round(videoPct * 100)}%)` : 'Rendering physical camera movement at 25 FPS (takes ~20-30s)'}
+                    {videoBusy ? `Compositing particles, visuals & voiceover narration (${Math.round(videoPct * 100)}%)` : 'Rendering physical camera movement at 25 FPS (takes ~20-30s)'}
                   </p>
                 </div>
                 {videoBusy && (
@@ -849,7 +900,7 @@ function VideoGeneratorInner() {
 
                 <div className="text-center text-[11px] text-[var(--text-muted)] space-y-1">
                   {video && (
-                    <p>Format: {video.width}×{video.height} · {video.durationSec}s · Synchronized Voiceover · Atmospheric Particles</p>
+                    <p>Format: {video.width}×{video.height} · {video.durationSec}s · All {scenes.length} Scenes Synchronized · Voiceover & Embers</p>
                   )}
                   {aiVideoUrl && (
                     <p>Format: 25 FPS · Lightricks LTX-Video Generative Neural Diffusion</p>
@@ -867,7 +918,7 @@ function VideoGeneratorInner() {
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--text)]">Your Video Preview Will Appear Here</h3>
                 <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-                  Select your visuals and configure your settings on the left, then click <strong>Render Kinetic Reel</strong> or <strong>Generate AI Video</strong> to produce your video!
+                  Click <strong>&ldquo;1-Click: Generate All {scenes.length} Visuals&rdquo;</strong> to generate contextual images for every scene, then click <strong>Render All Scenes into Video Reel</strong>!
                 </p>
               </div>
             )}
