@@ -58,8 +58,8 @@ interface GeminiResponse {
  * or null when unavailable/failed so the caller falls through to the free
  * provider. Never logs the API key.
  */
-async function generateWithGemini(prompt: string): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY;
+async function generateWithGemini(prompt: string, userKey?: string): Promise<string | null> {
+  const key = userKey || process.env.GEMINI_API_KEY;
   // Unset or placeholder-looking key — use the free fallback instead.
   if (!key || key.trim().length <= 10) return null;
 
@@ -172,8 +172,10 @@ export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
+  const userGeminiKey = req.headers.get('x-user-gemini-key')?.trim();
+
   try {
-    const body = await readJson<{ prompt?: unknown; aspect?: unknown }>(req);
+    const body = await readJson<{ prompt?: unknown; aspect?: unknown; userGeminiKey?: string }>(req);
     if (!body) return badRequest('Invalid request — please refresh the page and try again.');
 
     // ── Validation ────────────────────────────────────────────────
@@ -190,8 +192,10 @@ export async function POST(req: NextRequest) {
     // Membership checked above, so the cast is sound.
     const aspect = rawAspect as Aspect;
 
+    const activeGeminiKey = userGeminiKey || body.userGeminiKey?.trim();
+
     // ── Providers, tried in order ─────────────────────────────────
-    const gemini = await generateWithGemini(prompt);
+    const gemini = await generateWithGemini(prompt, activeGeminiKey);
     if (gemini) {
       recordMetaAITrace({
         feature: 'Visual Scene & AI Presenter Generation',

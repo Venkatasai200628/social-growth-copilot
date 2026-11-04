@@ -5,11 +5,14 @@ import Link from 'next/link';
 import {
   Film, ArrowLeft, Download, RefreshCw, Sparkles, Upload, Wand2, Mic,
   Monitor, AlertCircle, Zap, Clapperboard,
-  CheckCircle2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2, HelpCircle
+  CheckCircle2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2, HelpCircle,
+  Key
 } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card } from '../components/ui';
+import ApiKeyModal from '../components/ApiKeyModal';
+import { loadUserApiKeys, maskApiKey, UserApiKeys } from '@/lib/api-keys';
 import { authFetch } from '@/lib/client';
 import {
   renderPromoVideo, downloadVideo, RenderResult, VIDEO_THEMES, VIDEO_TRANSITIONS,
@@ -153,6 +156,12 @@ function VideoGeneratorInner() {
   // Video Engine Mode
   const [videoMode, setVideoMode] = useState<'kinetic' | 'generative'>('kinetic');
   const [showEngineInfo, setShowEngineInfo] = useState(false);
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [userKeys, setUserKeys] = useState<UserApiKeys>({});
+
+  useEffect(() => {
+    setUserKeys(loadUserApiKeys());
+  }, []);
 
   // Kinetic Video Render state
   const [video, setVideo] = useState<RenderResult | null>(null);
@@ -347,10 +356,16 @@ function VideoGeneratorInner() {
 
     try {
       const prompt = buildContextualScenePrompt(targetScene, productDesc, category);
+      const headers: Record<string, string> = {};
+      if (userKeys.geminiKey) {
+        headers['x-user-gemini-key'] = userKeys.geminiKey;
+      }
+
       const res = await authFetch('/api/scene-image', {
         prompt,
         aspect: selectedAspect,
-      });
+        userGeminiKey: userKeys.geminiKey,
+      }, { headers });
       const data = await res.json();
 
       if (res.status === 429 || data.error === 'RATE_LIMIT') {
@@ -519,11 +534,17 @@ function VideoGeneratorInner() {
     setAiVideoUrl(null);
     try {
       const promptText = `Cinematic commercial camera pan, physical subject movement, photorealistic high quality ad of ${productDesc || 'product and presenter'}`;
+      const headers: Record<string, string> = {};
+      if (userKeys.replicateToken) {
+        headers['x-user-replicate-key'] = userKeys.replicateToken;
+      }
+
       const res = await authFetch('/api/generate-ai-video', {
         image: targetImage,
         prompt: promptText,
         aspect: selectedAspect,
-      }, { method: 'POST' });
+        userApiKey: userKeys.replicateToken,
+      }, { method: 'POST', headers });
 
       const data = await res.json();
       if (!res.ok || data.error) {
@@ -539,6 +560,20 @@ function VideoGeneratorInner() {
     } finally {
       setAiVideoBusy(false);
     }
+  };
+
+  // Instant Sample Generative AI Video preview (100% Free Demo)
+  const handlePreviewSampleGenerativeVideo = () => {
+    setAiVideoUrl('/samples/ai-video-demo.mp4');
+    setAiVideoError('');
+    setVideoError('');
+    toast('Loaded sample AI physical motion video! You can test the player, scrubber, and download.', 'ai');
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.play().catch(() => {});
+        setIsPlaying(true);
+      }
+    }, 200);
   };
 
   // Player controls helpers
@@ -1109,6 +1144,35 @@ function VideoGeneratorInner() {
                   🎬 <strong>Replicate LTX-Video neural diffusion</strong> generates physical camera sweep and subject motion from your first visual.
                 </p>
 
+                <div className="flex items-center justify-between p-2.5 rounded-xl border border-[var(--border)] bg-[var(--input-bg)]">
+                  <div className="flex items-center gap-2">
+                    <Key size={14} className={userKeys.replicateToken ? 'text-green-400' : 'text-amber-400'} />
+                    <div>
+                      <p className="text-[11px] font-semibold text-[var(--text)]">
+                        {userKeys.replicateToken ? (
+                          <span className="text-green-400">Custom Replicate Token Connected</span>
+                        ) : (
+                          <span>Using System Replicate Token</span>
+                        )}
+                      </p>
+                      <p className="text-[9px] text-[var(--text-muted)]">
+                        {userKeys.replicateToken
+                          ? maskApiKey(userKeys.replicateToken)
+                          : 'Have your own Replicate account or new key? Connect it securely'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="subtle"
+                    size="sm"
+                    onClick={() => setIsKeyModalOpen(true)}
+                    className="text-[10px] px-2.5 py-1"
+                  >
+                    {userKeys.replicateToken ? 'Change' : '🔑 Connect Key'}
+                  </Button>
+                </div>
+
                 {readyImagesCount === 0 ? (
                   <div className="p-3 rounded-xl bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] text-[11px] text-[var(--text-soft)] flex items-center gap-2">
                     <Sparkles size={14} className="text-[var(--accent)] shrink-0" />
@@ -1126,18 +1190,28 @@ function VideoGeneratorInner() {
                   </div>
                 )}
 
-                <Button
-                  className="w-full mt-2"
-                  size="lg"
-                  onClick={makeGenerativeVideo}
-                  disabled={aiVideoBusy || readyImagesCount === 0}
-                >
-                  {aiVideoBusy ? (
-                    <><RefreshCw size={14} className="animate-spin" /> Generating LTX Diffusion Video… (~25s)</>
-                  ) : (
-                    <><Film size={14} /> Generate Physical AI Video 🚀</>
-                  )}
-                </Button>
+                <div className="space-y-2 pt-1">
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={makeGenerativeVideo}
+                    disabled={aiVideoBusy || readyImagesCount === 0}
+                  >
+                    {aiVideoBusy ? (
+                      <><RefreshCw size={14} className="animate-spin" /> Generating LTX Diffusion Video… (~25s)</>
+                    ) : (
+                      <><Film size={14} /> Generate Physical AI Video 🚀</>
+                    )}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={handlePreviewSampleGenerativeVideo}
+                    className="w-full py-2.5 px-3 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)] hover:bg-white/5 text-[11px] font-semibold text-[var(--accent-soft)] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Play size={13} /> ▶️ Test / Preview Sample AI Video (Free Instant Demo)
+                  </button>
+                </div>
               </div>
             )}
           </Card>
@@ -1165,20 +1239,41 @@ function VideoGeneratorInner() {
                   <p className="font-semibold">Generation notice:</p>
                   <p className="mt-0.5 leading-relaxed">{videoError || aiVideoError}</p>
                   {aiVideoError && (
-                    <div className="mt-2.5 pt-2 border-t border-[color-mix(in_srgb,var(--danger)_20%,transparent)] space-y-2">
+                    <div className="mt-2.5 pt-2 border-t border-[color-mix(in_srgb,var(--danger)_20%,transparent)] space-y-2.5">
                       <p className="text-[11px] text-[var(--text-soft)] leading-relaxed">
-                        💡 <strong>Why this happens:</strong> Replicate is a paid external cloud GPU service ($0.05/generation). Your Replicate account has a $0 balance. You do NOT need to pay — you can render your entire 7-scene video immediately using the free built-in engine!
+                        💡 <strong>Why this happens:</strong> Replicate cloud GPUs charge ~$0.05 per video and require prepaid billing credits. You have 3 options:
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setVideoMode('kinetic');
-                          setAiVideoError('');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--neon)] text-black font-semibold text-xs hover:opacity-90 transition-all shadow-sm"
-                      >
-                        <Zap size={13} /> Switch to Free Instant Kinetic Reel (Zero Credits Needed)
-                      </button>
+                      <ul className="text-[10px] text-[var(--text-muted)] space-y-1 list-disc pl-3">
+                        <li><strong>Switch to Free Kinetic Reel:</strong> 100% Free forever, renders full 7-scene video in 3s without any API key.</li>
+                        <li><strong>Connect your own Replicate Key:</strong> If you created a new account or added credit, enter your personal token.</li>
+                        <li><strong>Test Instant Free Demo:</strong> Preview and test the AI video player, scrubber, and download immediately.</li>
+                      </ul>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVideoMode('kinetic');
+                            setAiVideoError('');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--neon)] text-black font-semibold text-xs hover:opacity-90 transition-all shadow-sm"
+                        >
+                          <Zap size={13} /> Switch to Free Instant Kinetic Reel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsKeyModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] text-white font-semibold text-xs hover:border-[var(--accent)] transition-all shadow-sm"
+                        >
+                          <Key size={13} /> 🔑 Enter Different API Key
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePreviewSampleGenerativeVideo}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/15 text-[var(--accent-soft)] font-semibold text-xs hover:bg-[var(--accent)]/25 transition-all shadow-sm"
+                        >
+                          <Play size={13} /> ▶️ Test Free Demo Video
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1335,6 +1430,18 @@ function VideoGeneratorInner() {
           </Card>
         </div>
       </div>
+
+      {/* Secure API Key Manager Modal */}
+      <ApiKeyModal
+        isOpen={isKeyModalOpen}
+        onClose={() => {
+          setIsKeyModalOpen(false);
+          setUserKeys(loadUserApiKeys());
+        }}
+        onKeysChanged={() => {
+          setUserKeys(loadUserApiKeys());
+        }}
+      />
     </main>
   );
 }

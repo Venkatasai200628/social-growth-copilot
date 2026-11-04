@@ -14,17 +14,21 @@ export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
-  const token = process.env.REPLICATE_API_TOKEN;
-  if (!token) {
-    return badRequest('REPLICATE_API_TOKEN is not configured on the server.');
-  }
+  // ── Secure BYOK: Extract user-provided custom key from private header or body ──
+  const userHeaderToken = req.headers.get('x-user-replicate-key')?.trim();
 
   try {
     const body = await readJson<{
       image?: string;
       prompt?: string;
       aspect?: string;
+      userApiKey?: string;
     }>(req);
+
+    const token = userHeaderToken || body?.userApiKey?.trim() || process.env.REPLICATE_API_TOKEN;
+    if (!token) {
+      return badRequest('No Replicate API token provided. Please connect your Replicate API key in the Video Generator or set REPLICATE_API_TOKEN.');
+    }
 
     if (!body || !body.image) {
       return badRequest('An image data URL or image link is required to generate AI video.');
