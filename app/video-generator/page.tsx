@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Film, ArrowLeft, Download, RefreshCw, Sparkles, Upload, Wand2, Mic,
   Monitor, AlertCircle, Zap, Clapperboard,
-  CheckCircle2, Trash2, Camera
+  CheckCircle2, Trash2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2
 } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
@@ -58,6 +58,13 @@ function VideoGeneratorInner() {
   const [aiVideoUrl, setAiVideoUrl] = useState<string | null>(null);
   const [aiVideoBusy, setAiVideoBusy] = useState(false);
   const [aiVideoError, setAiVideoError] = useState('');
+
+  // Custom Video Player Scrubber & Controls
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Visuals State (Uploads + AI generation)
   const [photos, setPhotos] = useState<string[]>([]);
@@ -207,6 +214,7 @@ function VideoGeneratorInner() {
         (p: number) => setVideoPct(p)
       );
       setVideo(res);
+      setVideoDuration(res.durationSec);
       toast('Kinetic Video Reel rendered successfully! 🎬', 'ai');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to render video';
@@ -252,6 +260,59 @@ function VideoGeneratorInner() {
     }
   };
 
+  // Player controls helpers
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (videoRef.current.paused) {
+      videoRef.current.play();
+      setIsPlaying(true);
+    } else {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = !videoRef.current.muted;
+    setIsMuted(videoRef.current.muted);
+  };
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current) return;
+    setCurrentTime(videoRef.current.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    if (!videoRef.current) return;
+    const v = videoRef.current;
+    if (!isFinite(v.duration) || isNaN(v.duration)) {
+      v.currentTime = 1e10;
+      v.ontimeupdate = () => {
+        v.ontimeupdate = null;
+        v.currentTime = 0;
+        setVideoDuration(v.duration || video?.durationSec || 10);
+      };
+    } else {
+      setVideoDuration(v.duration || video?.durationSec || 10);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
+
+  const handleFullscreen = () => {
+    if (!videoRef.current) return;
+    if (videoRef.current.requestFullscreen) {
+      videoRef.current.requestFullscreen();
+    }
+  };
+
   return (
     <main className="min-h-screen py-10 px-4 md:px-8 max-w-7xl mx-auto">
       {/* Top Navigation Bar */}
@@ -268,7 +329,7 @@ function VideoGeneratorInner() {
               <Film className="text-[var(--neon)]" size={22} /> AI Video Production Studio
             </h1>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Render your commercial video reel with CapCut-grade kinetic typography or physical AI diffusion motion.
+              Render your video reel with kinetic typography, custom theme palettes, or physical AI diffusion motion.
             </p>
           </div>
         </div>
@@ -382,7 +443,9 @@ function VideoGeneratorInner() {
             {photos.length > 0 && (
               <div className="mt-4 pt-3 border-t border-[var(--border)]">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-[var(--text-soft)] font-medium">Timeline Visuals:</span>
+                  <span className="text-[11px] text-[var(--text-soft)] font-medium">
+                    Timeline Visuals ({photos.length} active — cycled across all scenes):
+                  </span>
                   <button
                     type="button"
                     onClick={() => updatePhotos([])}
@@ -395,7 +458,7 @@ function VideoGeneratorInner() {
                   {photos.map((src, i) => (
                     <div key={i} className="relative group rounded-lg overflow-hidden border border-[var(--border)] aspect-[9/16] bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt={`Scene ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={src} alt={`Visual #${i + 1}`} className="w-full h-full object-cover" />
                       <span className="absolute top-1 left-1 bg-black/70 text-[9px] px-1 py-0.5 rounded text-white font-mono">
                         #{i + 1}
                       </span>
@@ -409,7 +472,7 @@ function VideoGeneratorInner() {
           {/* Card 2: Engine & Customization */}
           <Card className="p-5">
             <div className="text-xs text-[var(--neon)] uppercase tracking-wider font-bold flex items-center gap-1.5 mb-3">
-              <Clapperboard size={13} /> Step 2: Choose Video Engine
+              <Clapperboard size={13} /> Step 2: Video Engine & Themes
             </div>
 
             <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] mb-4 text-xs">
@@ -443,6 +506,68 @@ function VideoGeneratorInner() {
                   ⚡ <strong>CapCut-grade kinetic typography</strong> with atmospheric ember particles, scene transitions, and synchronized voice narration. 100% Free & Fast (~3s).
                 </p>
 
+                {/* 1. Theme Palette Selector */}
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                  <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                    <Palette size={13} className="text-[var(--gold)]" /> Design Theme Palette
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {VIDEO_THEMES.map((theme) => {
+                      const isSelected = selectedTheme === theme.id;
+                      return (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => setSelectedTheme(theme.id)}
+                          className={`p-2 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col gap-1 ${
+                            isSelected
+                              ? 'border-[var(--accent)] bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-sm'
+                              : 'border-[var(--border)] bg-[var(--input-bg)] hover:border-[var(--border-strong)]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm"
+                              style={{ backgroundColor: theme.accent }}
+                            />
+                            {isSelected && <span className="text-[10px] text-[var(--accent)] font-bold">✓</span>}
+                          </div>
+                          <span className="text-[11px] font-bold text-[var(--text)] mt-0.5">{theme.name}</span>
+                          <span className="text-[9px] text-[var(--text-muted)] truncate">{theme.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Format Style Selector */}
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                  <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                    <Layout size={13} className="text-[var(--neon)]" /> Video Presentation Format
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {VIDEO_FORMAT_STYLES.map((fs) => {
+                      const isSelected = selectedFormat === fs.id;
+                      return (
+                        <button
+                          key={fs.id}
+                          type="button"
+                          onClick={() => setSelectedFormat(fs.id)}
+                          className={`p-2 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-[var(--neon)] bg-[color-mix(in_srgb,var(--neon)_15%,transparent)] font-semibold'
+                              : 'border-[var(--border)] bg-[var(--input-bg)] text-[var(--text-muted)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold block text-[var(--text)] truncate">{fs.name}</span>
+                          <span className="text-[9px] text-[var(--text-muted)] block truncate">{fs.badge}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Dimensions, Transitions & Voice */}
                 <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
                   <div>
                     <label className="text-[11px] text-[var(--text-soft)] block mb-1">Dimensions</label>
@@ -452,26 +577,6 @@ function VideoGeneratorInner() {
                       className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-2.5 py-1.5 text-xs text-[var(--text)]"
                     >
                       {ASPECT_RATIOS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-[var(--text-soft)] block mb-1">Theme Palette</label>
-                    <select
-                      value={selectedTheme}
-                      onChange={(e) => setSelectedTheme(e.target.value)}
-                      className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-2.5 py-1.5 text-xs text-[var(--text)]"
-                    >
-                      {VIDEO_THEMES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-[var(--text-soft)] block mb-1">Format Style</label>
-                    <select
-                      value={selectedFormat}
-                      onChange={(e) => setSelectedFormat(e.target.value as VideoFormatStyle)}
-                      className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-2.5 py-1.5 text-xs text-[var(--text)]"
-                    >
-                      {VIDEO_FORMAT_STYLES.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -506,6 +611,43 @@ function VideoGeneratorInner() {
                       <option value="male">Male</option>
                     </select>
                   )}
+                </div>
+
+                {/* 4. Scene Storyboard & Visuals Sync Preview */}
+                <div className="pt-2 border-t border-[var(--border)] space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[var(--text)]">
+                    <span className="flex items-center gap-1.5">
+                      <Clapperboard size={12} className="text-[var(--neon)]" /> Storyboard Text & Visuals Sync
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      {scriptData?.scenes?.length || 3} scenes
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                    {((scriptData?.scenes && scriptData.scenes.length > 0) ? scriptData.scenes : [
+                      { scene_number: 1, text_overlay: businessName, voiceover: scriptData?.hook_line || 'Special Offer' },
+                      { scene_number: 2, text_overlay: 'Exclusive Quality', voiceover: 'Handcrafted quality and premium design.' },
+                      { scene_number: 3, text_overlay: 'Limited Time Offer', voiceover: 'Visit our store or order online today!' }
+                    ]).map((sc, i) => {
+                      const activePhoto = photos.length > 0 ? photos[i % photos.length] : null;
+                      return (
+                        <div key={i} className="flex items-center gap-2 p-1.5 rounded-lg bg-[var(--input-bg)] border border-[var(--border)]">
+                          {activePhoto ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={activePhoto} alt="" className="w-6 h-9 object-cover rounded border border-[var(--border)] shrink-0" />
+                          ) : (
+                            <div className="w-6 h-9 rounded bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-[9px] text-white/40">
+                              #{i + 1}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-bold text-[var(--text)] truncate">Scene {i + 1}: {sc.text_overlay || 'Scene'}</p>
+                            <p className="text-[9px] text-[var(--text-muted)] truncate italic">&ldquo;{sc.voiceover}&rdquo;</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <Button className="w-full mt-2" size="lg" onClick={makeKineticVideo} disabled={videoBusy}>
@@ -602,29 +744,75 @@ function VideoGeneratorInner() {
               </div>
             )}
 
-            {/* Rendered Video Player */}
+            {/* Rendered Video Player with Smooth Custom Scrubber */}
             {!videoBusy && !aiVideoBusy && (video || aiVideoUrl) && (
               <div className="space-y-6">
-                <div className="flex justify-center bg-black/60 rounded-2xl p-4 border border-[var(--border)] shadow-2xl">
-                  {video ? (
-                    <video
-                      src={video.url}
-                      controls
-                      playsInline
-                      autoPlay
-                      loop
-                      className="max-h-[520px] rounded-xl shadow-lg border border-white/10"
-                    />
-                  ) : (
-                    <video
-                      src={aiVideoUrl!}
-                      controls
-                      playsInline
-                      autoPlay
-                      loop
-                      className="max-h-[520px] rounded-xl shadow-lg border border-white/10"
-                    />
-                  )}
+                <div className="relative group rounded-2xl overflow-hidden bg-black border border-[var(--border)] shadow-2xl flex flex-col items-center">
+                  <video
+                    ref={videoRef}
+                    src={video ? video.url : aiVideoUrl!}
+                    playsInline
+                    autoPlay
+                    loop
+                    onTimeUpdate={handleTimeUpdate}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    className="max-h-[500px] w-auto mx-auto object-contain cursor-pointer"
+                    onClick={togglePlay}
+                  />
+
+                  {/* Sleek Custom Scrubber & Control Bar */}
+                  <div className="w-full bg-slate-900/90 backdrop-blur-md px-4 py-3 border-t border-white/10 space-y-2">
+                    {/* Draggable Progress Slider */}
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min={0}
+                        max={videoDuration || video?.durationSec || 10}
+                        step={0.05}
+                        value={currentTime}
+                        onChange={handleSeek}
+                        className="w-full h-2 rounded-lg bg-white/20 accent-[var(--neon)] cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Controls Row */}
+                    <div className="flex items-center justify-between text-xs text-white">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={togglePlay}
+                          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                          title={isPlaying ? 'Pause' : 'Play'}
+                        >
+                          {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={toggleMute}
+                          className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                          title={isMuted ? 'Unmute' : 'Mute'}
+                        >
+                          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                        </button>
+
+                        <span className="font-mono text-[11px] text-white/70">
+                          {Math.floor(currentTime)}s / {Math.floor(videoDuration || video?.durationSec || 10)}s
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleFullscreen}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                        title="Fullscreen"
+                      >
+                        <Maximize2 size={14} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Big Action Buttons */}

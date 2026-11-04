@@ -542,8 +542,13 @@ export async function renderPromoVideo(
   const images = await Promise.all(
     spec.scenes.map(async (s, i) => {
       try {
-        const photo = spec.photos?.[i];
-        if (photo?.startsWith('data:image')) return await loadImage(photo);
+        // If the user has photos (uploaded or AI generated), cycle them across all scenes so EVERY scene has a visual!
+        if (spec.photos && spec.photos.length > 0) {
+          const photo = spec.photos[i % spec.photos.length];
+          if (photo && (photo.startsWith('data:image') || photo.startsWith('http') || photo.startsWith('/'))) {
+            return await loadImage(photo);
+          }
+        }
         if (s.imagePrompt) {
           const dl = await fetchSceneImage(s.imagePrompt);
           if (dl) return await loadImage(dl); // dataURL — loads instantly
