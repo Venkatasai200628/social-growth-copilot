@@ -346,7 +346,7 @@ function VideoGeneratorInner() {
   };
 
   // Generate visual for a single specific scene
-  const generateSceneVisual = async (sceneIndex: number): Promise<{ success: boolean; retryAfter?: number }> => {
+  const generateSceneVisual = async (sceneIndex: number): Promise<{ success: boolean; retryAfter?: number; imageDataUrl?: string }> => {
     const targetScene = scenes[sceneIndex];
     if (!targetScene) return { success: false };
 
@@ -391,7 +391,7 @@ function VideoGeneratorInner() {
       });
 
       toast(`Scene ${sceneIndex + 1} visual generated! 📸`, 'ai');
-      return { success: true };
+      return { success: true, imageDataUrl: data.imageDataUrl };
     } catch (err) {
       setScenes((prev) =>
         prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: false } : s))
@@ -401,55 +401,79 @@ function VideoGeneratorInner() {
     }
   };
 
-  // 1-Click AI Full Workflow: Generate All Scenes with Intelligent Cooldown & Auto-Retry
+  // 1-Click AI Full Workflow: Generate All Scenes with Intelligent Cooldown & 1.5-Min Auto-Pacing
   const generateAllSceneVisuals = async () => {
     if (scenes.length === 0) return;
     setBatchBusy(true);
     cancelBatchRef.current = false;
 
-    for (let i = 0; i < scenes.length; i++) {
+    const currentScenes: Scene[] = [...scenes];
+
+    for (let i = 0; i < currentScenes.length; i++) {
       if (cancelBatchRef.current) break;
 
       // Skip already-generated visuals to save time & API quota
-      if (scenes[i].image) {
+      if (currentScenes[i].image) {
         continue;
       }
 
-      setBatchStep(i + 1);
-      setBatchStatusText(`Generating Scene ${i + 1} of ${scenes.length}: ${scenes[i].shot_type || 'Visual'}…`);
+      let generated = false;
+      while (!generated && !cancelBatchRef.current) {
+        setBatchStep(i + 1);
+        setBatchStatusText(`Generating Scene ${i + 1} of ${currentScenes.length}: ${currentScenes[i].shot_type || 'Visual'}…`);
 
-      let result = await generateSceneVisual(i);
-      if (cancelBatchRef.current) break;
+        const result = await generateSceneVisual(i);
+        if (cancelBatchRef.current) break;
 
-      // If hit provider cooldown (1 image every 45s), countdown live and auto-retry
-      if (!result.success && result.retryAfter) {
-        let remaining = result.retryAfter + 2;
-        while (remaining > 0 && !cancelBatchRef.current) {
-          setCooldownSec(remaining);
-          setBatchStatusText(
-            `⏳ AI Provider Cooldown: Generating Scene ${i + 1} in ${remaining}s… (Free tier auto-pacing)`
-          );
-          await new Promise((r) => setTimeout(r, 1000));
-          remaining--;
+        if (result.success && result.imageDataUrl) {
+          generated = true;
+          currentScenes[i] = { ...currentScenes[i], image: result.imageDataUrl };
+
+          // If there are more scenes to generate, auto-wait the cooldown before auto-triggering the next scene
+          if (i < currentScenes.length - 1 && !cancelBatchRef.current) {
+            // Gemini key has no rate limit (~2s pause); free tier auto-paces every 1.5 minutes (90s)
+            const waitInterval = userKeys.geminiKey ? 2 : 90;
+            let remaining = waitInterval;
+
+            while (remaining > 0 && !cancelBatchRef.current) {
+              setCooldownSec(remaining);
+              setBatchStatusText(
+                `⏳ Auto-Pacing (1.5 min check): Scene ${i + 1} ready! Next scene auto-generating in ${remaining}s…`
+              );
+              await new Promise((r) => setTimeout(r, 1000));
+              remaining--;
+            }
+            setCooldownSec(0);
+          }
+        } else {
+          // Cooldown / Rate Limit hit — wait 1.5 minutes (90s) and automatically re-check and retry
+          const waitInterval = Math.max(90, result.retryAfter || 90);
+          let remaining = waitInterval;
+
+          while (remaining > 0 && !cancelBatchRef.current) {
+            setCooldownSec(remaining);
+            setBatchStatusText(
+              `⏳ AI Provider Cooldown: Auto-checking & retrying Scene ${i + 1} in ${remaining}s… (1.5 min check)`
+            );
+            await new Promise((r) => setTimeout(r, 1000));
+            remaining--;
+          }
+          setCooldownSec(0);
         }
-        setCooldownSec(0);
-
-        if (!cancelBatchRef.current) {
-          setBatchStatusText(`Retrying Scene ${i + 1} of ${scenes.length}…`);
-          result = await generateSceneVisual(i);
-        }
-      }
-
-      // Small 1.5s aesthetic pause between scenes
-      if (i < scenes.length - 1 && !cancelBatchRef.current) {
-        await new Promise((r) => setTimeout(r, 1500));
       }
     }
 
     setBatchBusy(false);
     setCooldownSec(0);
     setBatchStatusText('');
-    toast('Contextual AI visual workflow completed! 🎬', 'ai');
+
+    // If batch finished without cancellation and all scenes are ready, automatically render the video!
+    if (!cancelBatchRef.current && currentScenes.every((s) => !!s.image)) {
+      toast('🎉 All 7 scene visuals generated! Auto-rendering full video reel…', 'ai');
+      await makeKineticVideo(currentScenes);
+    } else if (!cancelBatchRef.current) {
+      toast('Visual batch completed for available scenes!', 'ai');
+    }
   };
 
   // Upload custom photo for a specific scene
@@ -475,8 +499,9 @@ function VideoGeneratorInner() {
   };
 
   // Render Instant Kinetic Reel (CapCut-grade) using all scenes & their exact matching visuals
-  const makeKineticVideo = async () => {
-    const sceneList: VideoScene[] = scenes.map((s) => ({
+  const makeKineticVideo = async (scenesToRender?: Scene[] | unknown) => {
+    const activeScenes = Array.isArray(scenesToRender) && scenesToRender.length > 0 ? (scenesToRender as Scene[]) : scenes;
+    const sceneList: VideoScene[] = activeScenes.map((s) => ({
       title: s.text_overlay || s.shot_type || 'Special Offer',
       subtitle: s.voiceover || s.visual || '',
       imagePrompt: s.visual,
@@ -737,8 +762,8 @@ function VideoGeneratorInner() {
                     </p>
                     <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
                       {cooldownSec > 0
-                        ? `⏳ Free tier auto-pacing: next visual unlocks in ${cooldownSec}s…`
-                        : 'Auto-pacing guarantees 100% reliable image delivery without rate-limit errors.'}
+                        ? `⏳ Auto-pacing (1.5 min check): Next scene visual triggers automatically in ${cooldownSec}s…`
+                        : 'Auto-pacing active: Automatically generates each scene visual and renders the video reel.'}
                     </p>
                   </div>
                 </div>
