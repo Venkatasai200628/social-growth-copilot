@@ -67,7 +67,13 @@ function VideoStudioInner() {
   const [activeTab, setActiveTab] = useState<TabKey>('script');
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingHook, setEditingHook] = useState(false);
+  const [editingScript, setEditingScript] = useState(false);
   const [editingSceneIdx, setEditingSceneIdx] = useState<number | null>(null);
+
+  const updateVoiceoverScript = (val: string) => {
+    if (!result) return;
+    updateResult({ ...result, voiceover_script: val });
+  };
 
   const addCustomScene = () => {
     if (!result) return;
@@ -121,6 +127,9 @@ function VideoStudioInner() {
       return;
     }
     setError(''); setGenerating(true); updateResult(null);
+    try {
+      sessionStorage.removeItem('gm_scene_images');
+    } catch { /* ignore */ }
     try {
       const payload = {
         ...form,
@@ -390,11 +399,30 @@ function VideoStudioInner() {
                     {activeTab === 'script' && (
                       <div id="video-tab-script" role="tabpanel" aria-label="Full voiceover script">
                         <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-                          <span className="text-xs text-[var(--text-muted)] uppercase tracking-widest">Full Voiceover Script</span>
-                          <CopyButton text={result.voiceover_script} label="Copy script" />
+                          <span className="text-xs text-[var(--text-muted)] uppercase tracking-widest font-semibold">Full Voiceover Script</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingScript(!editingScript)}
+                              className="text-xs text-[var(--neon)] hover:underline font-medium px-2.5 py-1 rounded-lg bg-[color-mix(in_srgb,var(--neon)_12%,transparent)] border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] transition-all"
+                            >
+                              {editingScript ? '✓ Done Editing' : '✏️ Edit Script'}
+                            </button>
+                            <CopyButton text={result.voiceover_script} label="Copy script" />
+                          </div>
                         </div>
                         <div className="bg-[var(--bg-alt)] rounded-2xl p-5 border border-[var(--border)]">
-                          <p className="text-[var(--text-soft)] text-sm leading-loose whitespace-pre-wrap">{result.voiceover_script}</p>
+                          {editingScript ? (
+                            <textarea
+                              value={result.voiceover_script}
+                              onChange={(e) => updateVoiceoverScript(e.target.value)}
+                              rows={8}
+                              className="w-full bg-transparent text-[var(--text)] text-sm leading-relaxed border border-[var(--input-border)] rounded-xl p-3 focus:outline-none focus:border-[var(--neon)] resize-y"
+                              placeholder="Type or customize your full voiceover script here..."
+                            />
+                          ) : (
+                            <p className="text-[var(--text-soft)] text-sm leading-loose whitespace-pre-wrap">{result.voiceover_script}</p>
+                          )}
                         </div>
                         <div className="mt-4 flex items-center gap-2 text-xs text-[var(--text-faint)]">
                           <Clock size={11} />Estimated read time: ~{Math.ceil((result.voiceover_script || '').split(' ').length / 2.5)}s at normal pace

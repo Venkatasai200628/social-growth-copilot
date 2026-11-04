@@ -60,13 +60,24 @@ export interface VideoTheme {
   bg2: string;
 }
 
+export type TypographyStyle = 'impactSans' | 'luxurySerif' | 'modernChic' | 'boldNeon';
+
+export const TYPOGRAPHY_STYLES: { id: TypographyStyle; name: string; desc: string; sample: string }[] = [
+  { id: 'impactSans', name: 'Impact Bold (Food & Retail)', desc: 'Punchy heavy sans-serif for high conversions', sample: 'Montserrat / Arial Black' },
+  { id: 'luxurySerif', name: 'Royal Serif (Jewellery & Luxury)', desc: 'High-end elegant display serif', sample: 'Playfair Display / Cinzel' },
+  { id: 'modernChic', name: 'Modern Chic (Fashion & Lifestyle)', desc: 'Refined editorial clean typography', sample: 'Poppins / Trebuchet' },
+  { id: 'boldNeon', name: 'Cyber Tech (Tech & Mobile)', desc: 'High-contrast modern geometric sans', sample: 'Inter / Roboto' },
+];
+
 export const VIDEO_THEMES: VideoTheme[] = [
   { id: 'royalGold', name: 'Royal Gold', description: 'Luxury, Jewellery & Festive', accent: '#d4af37', bg1: '#141414', bg2: '#000000' },
   { id: 'diwaliMaroon', name: 'Diwali Special', description: 'Festive Maroon & Golden Spark', accent: '#f5c04a', bg1: '#2b0a0a', bg2: '#120303' },
+  { id: 'kitchenSpice', name: 'Spice Orange', description: 'Vibrant for Cloud Kitchens, Burgers & Food', accent: '#ff6b35', bg1: '#2a0f0a', bg2: '#120604' },
+  { id: 'burgerNeon', name: 'Burger & Street Food', description: 'Punchy Golden Mustard & Sizzling Red', accent: '#f59e0b', bg1: '#881337', bg2: '#380614' },
+  { id: 'bakeryWarm', name: 'Warm Bakery', description: 'Cozy Artisanal, Sweets & Cafe', accent: '#ffb347', bg1: '#4a2c2a', bg2: '#1e0f0e' },
   { id: 'tealLuxe', name: 'Luxe Teal', description: 'Modern, Fresh & High-End', accent: '#2dd4bf', bg1: '#042f2b', bg2: '#01100e' },
-  { id: 'kitchenSpice', name: 'Spice Orange', description: 'Vibrant for Cloud Kitchens & Food', accent: '#ff6b35', bg1: '#2a0f0a', bg2: '#120604' },
   { id: 'boutiqueRose', name: 'Boutique Rose', description: 'Chic Apparel & Aesthetics', accent: '#f4a6c0', bg1: '#3d1c3a', bg2: '#160a16' },
-  { id: 'bakeryWarm', name: 'Warm Bakery', description: 'Cozy Artisanal & Sweets', accent: '#ffb347', bg1: '#4a2c2a', bg2: '#1e0f0e' },
+  { id: 'cyberBlue', name: 'Cyber Tech Blue', description: 'Electric Cyan & Sleek Navy', accent: '#38bdf8', bg1: '#0f172a', bg2: '#020617' },
 ];
 
 export const VIDEO_TRANSITIONS: { id: TransitionType; name: string; desc: string }[] = [
@@ -83,6 +94,10 @@ export interface VideoSpec {
   cta: string;
   /** Poster palette id for the color language. */
   paletteId?: string;
+  /** Typography font style. */
+  fontStyle?: TypographyStyle;
+  /** Business category. */
+  category?: string;
   /** Seconds per scene (default 2.5). */
   secondsPerScene?: number;
   /**
@@ -119,9 +134,41 @@ function paletteOf(id?: string) {
     tealLuxe:     { bg1: '#042f2b', bg2: '#01100e', ink: '#ecfffb', sub: '#a7e8df', accent: '#2dd4bf', accent2: '#fbbf24' },
     bakeryWarm:   { bg1: '#4a2c2a', bg2: '#1e0f0e', ink: '#fff6ec', sub: '#e8cda8', accent: '#ffb347', accent2: '#ffe0b3' },
     kitchenSpice: { bg1: '#2a0f0a', bg2: '#120604', ink: '#fff1e4', sub: '#e0b598', accent: '#ff6b35', accent2: '#ffc14d' },
+    burgerNeon:   { bg1: '#881337', bg2: '#380614', ink: '#fef3c7', sub: '#fde68a', accent: '#f59e0b', accent2: '#ef4444' },
     boutiqueRose: { bg1: '#3d1c3a', bg2: '#160a16', ink: '#fff5f8', sub: '#e8c4d4', accent: '#f4a6c0', accent2: '#ffd7e4' },
+    cyberBlue:    { bg1: '#0f172a', bg2: '#020617', ink: '#f8fafc', sub: '#94a3b8', accent: '#38bdf8', accent2: '#818cf8' },
   };
   return map[id ?? ''] ?? map.royalGold;
+}
+
+export function getFontForStyle(fontStyle?: TypographyStyle, category?: string): string {
+  if (fontStyle === 'impactSans') return '"Montserrat", "Arial Black", "Impact", "Arial", sans-serif';
+  if (fontStyle === 'luxurySerif') return '"Playfair Display", "Cinzel", "Georgia", serif';
+  if (fontStyle === 'modernChic') return '"Poppins", "Trebuchet MS", "Segoe UI", sans-serif';
+  if (fontStyle === 'boldNeon') return '"Inter", "Helvetica Neue", "Arial", sans-serif';
+
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('food') || cat.includes('burger') || cat.includes('dining') || cat.includes('kitchen') || cat.includes('bakery')) {
+    return '"Montserrat", "Arial Black", "Impact", "Arial", sans-serif';
+  }
+  if (cat.includes('jewel') || cat.includes('gold') || cat.includes('saree') || cat.includes('silk') || cat.includes('festive')) {
+    return '"Playfair Display", "Cinzel", "Georgia", serif';
+  }
+  return '"Poppins", "Segoe UI", sans-serif';
+}
+
+export function getPromoBadgeText(sceneIdx: number, totalScenes: number, category?: string): string {
+  const cat = (category || '').toLowerCase();
+  if (cat.includes('food') || cat.includes('burger') || cat.includes('dining') || cat.includes('kitchen') || cat.includes('bakery')) {
+    const foodBadges = ['🔥 MUST TRY SPECIAL', '🍔 CHEF\'S SIGNATURE', '✨ FRESH & SIZZLING', '⚡ CRAVE-WORTHY DEAL', '🍟 CRISPY & HOT'];
+    return foodBadges[sceneIdx % foodBadges.length];
+  }
+  if (cat.includes('jewel') || cat.includes('gold') || cat.includes('saree') || cat.includes('silk')) {
+    const jewelBadges = ['✨ 100% PURE CRAFTSMANSHIP', '💎 FESTIVE DHAMAKA', '🌟 TIMELESS ELEGANCE', '🏷️ EXCLUSIVE DISCOUNT', '🎁 INSURED DELIVERY'];
+    return jewelBadges[sceneIdx % jewelBadges.length];
+  }
+  const generalBadges = ['⭐ EXCLUSIVE DEAL', '🔥 LIMITED TIME OFFER', '✨ PREMIUM QUALITY', '⚡ TOP RATED SELECTION', '🏷️ SPECIAL PROMOTION'];
+  return generalBadges[sceneIdx % generalBadges.length];
 }
 
 const DISPLAY = '"Playfair Display", Georgia, serif';
@@ -245,15 +292,17 @@ function drawSceneText(
   p: ReturnType<typeof paletteOf>,
   title: string,
   subtitle: string | undefined,
-  progress: number
+  progress: number,
+  displayFont: string,
+  badgeText: string
 ) {
   // 1. Cinematic gradient scrim for maximum text legibility
-  const scrim = ctx.createLinearGradient(0, H * 0.50, 0, H);
+  const scrim = ctx.createLinearGradient(0, H * 0.45, 0, H);
   scrim.addColorStop(0, 'rgba(0,0,0,0)');
-  scrim.addColorStop(0.25, 'rgba(0,0,0,0.52)');
-  scrim.addColorStop(1, 'rgba(0,0,0,0.92)');
+  scrim.addColorStop(0.25, 'rgba(0,0,0,0.65)');
+  scrim.addColorStop(1, 'rgba(0,0,0,0.96)');
   ctx.fillStyle = scrim;
-  ctx.fillRect(0, H * 0.50, W, H * 0.50);
+  ctx.fillRect(0, H * 0.45, W, H * 0.55);
 
   // 2. Kinetic snap-in slide and alpha
   const easeProgress = Math.min(1, progress * 1.8);
@@ -263,49 +312,50 @@ function drawSceneText(
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  // 3. Highlight Category / Story Badge
-  const badgeY = H - 565 + slide;
+  // 3. Highlight Category / Promotional Badge Pill
+  const badgeY = H - 590 + slide;
+  ctx.font = `800 24px ${displayFont}`;
+  const badgeW = ctx.measureText(badgeText).width + 44;
+  drawRoundRect(ctx, 80, badgeY - 40, badgeW, 40, 20);
   ctx.fillStyle = `${p.accent}33`;
-  drawRoundRect(ctx, 90, badgeY - 34, 185, 34, 17);
   ctx.fill();
   ctx.strokeStyle = p.accent;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  ctx.font = `800 16px ${DISPLAY}`;
   ctx.fillStyle = p.accent;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('EXCLUSIVE HIGHLIGHT', 182, badgeY - 17);
+  ctx.fillText(badgeText, 80 + badgeW / 2, badgeY - 20);
   ctx.textAlign = 'left';
 
   // 4. Kinetic Main Title with Drop Shadow
-  let size = 88;
-  ctx.font = `900 ${size}px ${DISPLAY}`;
-  while (ctx.measureText(title).width > W - 180 && size > 40) {
+  let size = 84;
+  ctx.font = `900 ${size}px ${displayFont}`;
+  while (ctx.measureText(title).width > W - 160 && size > 38) {
     size -= 4;
-    ctx.font = `900 ${size}px ${DISPLAY}`;
+    ctx.font = `900 ${size}px ${displayFont}`;
   }
-  const titleLines = wrap(ctx, title, W - 180, 3);
+  const titleLines = wrap(ctx, title, W - 160, 3);
   ctx.textBaseline = 'top';
 
   titleLines.forEach((l, i) => {
-    const lineY = H - 515 + slide + i * (size * 1.14);
+    const lineY = H - 530 + slide + i * (size * 1.15);
     // Crisp drop shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 4;
+    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 6;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(l, 90, lineY);
+    ctx.fillText(l, 80, lineY);
   });
   ctx.shadowBlur = 0; // reset shadow
 
   // 5. Spoken Narration Subtitle with glowing backdrop
   if (subtitle) {
-    const subY = H - 515 + slide + titleLines.length * (size * 1.14) + 26;
-    ctx.font = `600 42px ${INDIC}`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
-    wrap(ctx, subtitle, W - 200, 2).forEach((l, i) => ctx.fillText(l, 90, subY + i * 58));
+    const subY = H - 530 + slide + titleLines.length * (size * 1.15) + 32;
+    ctx.font = `600 38px ${INDIC}`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    wrap(ctx, subtitle, W - 180, 2).forEach((l, i) => ctx.fillText(l, 80, subY + i * 52));
   }
   ctx.restore();
 }
@@ -691,13 +741,15 @@ export async function renderPromoVideo(
       if (sceneIdx < spec.scenes.length) {
         const img = images[sceneIdx];
         const scene = spec.scenes[sceneIdx];
+        const displayFont = getFontForStyle(spec.fontStyle, spec.category);
+        const badgeText = getPromoBadgeText(sceneIdx, spec.scenes.length, spec.category);
 
         if (formatStyle === 'motionExplainer' || formatStyle === 'whiteboard') {
           // ── Motion / Whiteboard Explainer ──
           // 1. Top Chapter progress bar
           drawChapterBars(ctx, sceneIdx, localProgress, totalScenes, W, p.accent, isWhiteboard);
 
-          // 2. Top Chapter Tag Pill
+          // 2. Top Chapter Tag Pill & Branded Header
           ctx.save();
           ctx.font = `700 22px ${SANS}`;
           const chapterText = `SCENE ${sceneIdx + 1} OF ${spec.scenes.length}`;
@@ -727,28 +779,53 @@ export async function renderPromoVideo(
             drawAtmosphericParticles(ctx, W, H, p.accent);
           }
 
-          // 5. Kinetic Typography (Scene Title)
-          const titleY = H > 1400 ? H * 0.58 : H * 0.60;
-          const slide = (1 - Math.min(1, localProgress * 2.2)) * 40;
+          // 5. Kinetic Typography (Scene Title & High-Contrast Promo Card)
+          const titleBoxY = H > 1400 ? H * 0.58 : H * 0.60;
+          const slide = (1 - Math.min(1, localProgress * 2.2)) * 35;
           const titleAlpha = Math.min(1, localProgress * 2.2);
           ctx.save();
           ctx.globalAlpha = titleAlpha;
-          ctx.fillStyle = p.accent;
-          ctx.fillRect(70, titleY + slide, 80, 8);
 
+          // 5a. Promo Badge Pill
+          ctx.font = `800 22px ${displayFont}`;
+          const badgeW = ctx.measureText(badgeText).width + 36;
+          drawRoundRect(ctx, 60, titleBoxY + slide - 38, badgeW, 36, 18);
+          ctx.fillStyle = isWhiteboard ? 'rgba(0,0,0,0.06)' : `${p.accent}25`;
+          ctx.fill();
+          ctx.strokeStyle = p.accent;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.fillStyle = p.accent;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(badgeText, 60 + badgeW / 2, titleBoxY + slide - 20);
+          ctx.textAlign = 'left';
+
+          // 5b. High-impact Headline Card Background
           let size = 68;
-          ctx.font = `900 ${size}px ${DISPLAY}`;
-          while (ctx.measureText(scene.title).width > W - 140 && size > 36) {
+          ctx.font = `900 ${size}px ${displayFont}`;
+          while (ctx.measureText(scene.title).width > W - 180 && size > 36) {
             size -= 4;
-            ctx.font = `900 ${size}px ${DISPLAY}`;
+            ctx.font = `900 ${size}px ${displayFont}`;
           }
-          const tLines = wrap(ctx, scene.title, W - 140, 2);
-          ctx.fillStyle = isWhiteboard ? '#0f172a' : '#ffffff';
+          const tLines = wrap(ctx, scene.title, W - 180, 2);
+          const boxH = tLines.length * (size * 1.15) + 36;
+          drawRoundRect(ctx, 60, titleBoxY + slide + 6, W - 120, boxH, 24);
+          ctx.fillStyle = isWhiteboard ? 'rgba(255, 255, 255, 0.95)' : 'rgba(11, 15, 25, 0.88)';
+          ctx.fill();
+          ctx.strokeStyle = isWhiteboard ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.16)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // 5c. Crisp Headline Text with Shadow
           ctx.textBaseline = 'top';
-          tLines.forEach((l, i) => ctx.fillText(l, 70, titleY + slide + 20 + i * (size * 1.12)));
+          ctx.fillStyle = isWhiteboard ? '#0f172a' : '#ffffff';
+          tLines.forEach((l, i) => {
+            ctx.fillText(l, 86, titleBoxY + slide + 24 + i * (size * 1.15));
+          });
           ctx.restore();
 
-          // 5. Voiceover Subtitle Capsule
+          // 6. Voiceover Subtitle Capsule
           if (scene.subtitle) {
             drawSubtitleCapsule(ctx, scene.subtitle, W, H, localProgress, isWhiteboard);
           }
@@ -767,7 +844,7 @@ export async function renderPromoVideo(
             ctx.fill();
             ctx.restore();
           }
-          drawSceneText(ctx, p, scene.title, scene.subtitle, localProgress);
+          drawSceneText(ctx, p, scene.title, scene.subtitle, localProgress, displayFont, badgeText);
         }
       } else {
         // ── final CTA Outro Card ──

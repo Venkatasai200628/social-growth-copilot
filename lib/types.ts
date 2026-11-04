@@ -53,11 +53,8 @@ export interface FormData {
 }
 
 export const CATEGORIES = [
-  { value: 'Food & Beverage',          label: 'Food & Beverage',          emoji: '🍔' },
+  { value: 'Food & Dining',            label: 'Food & Dining (Restaurant, Cafe, Bakery & Kitchen)', emoji: '🍔' },
   { value: 'Fashion & Clothing',       label: 'Fashion & Clothing',       emoji: '👗' },
-  { value: 'Cloud Kitchen',            label: 'Cloud Kitchen',            emoji: '🍲' },
-  { value: 'Bakery / Home Baker',      label: 'Bakery / Home Baker',      emoji: '🧁' },
-  { value: 'Tiffin / Home Food',       label: 'Tiffin / Home Food',       emoji: '🍱' },
   { value: 'Boutique / Tailoring',     label: 'Boutique / Tailoring',     emoji: '🧵' },
   { value: 'Silk & Sarees',            label: 'Silk & Sarees',            emoji: '🥻' },
   { value: 'Puja & Festive Items',     label: 'Puja & Festive Items',     emoji: '🪔' },

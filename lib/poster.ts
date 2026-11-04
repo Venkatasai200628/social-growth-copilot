@@ -497,12 +497,21 @@ function footer(ctx: CanvasRenderingContext2D, p: Palette, brand: string, city: 
   ctx.restore();
 }
 
-function loadImage(src: string): Promise<HTMLImageElement | null> {
+function loadImage(src: string, timeoutMs = 20_000): Promise<HTMLImageElement | null> {
   return new Promise((res) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => res(img);
-    img.onerror = () => res(null);
+    const timer = setTimeout(() => { img.src = ''; res(null); }, timeoutMs);
+    img.onload = () => { clearTimeout(timer); res(img); };
+    img.onerror = () => {
+      if (img.crossOrigin) {
+        img.crossOrigin = null as unknown as string;
+        img.src = src;
+      } else {
+        clearTimeout(timer);
+        res(null);
+      }
+    };
     img.src = src;
   });
 }

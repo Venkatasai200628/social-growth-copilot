@@ -13,7 +13,7 @@ import { Button, Card } from '../components/ui';
 import { authFetch } from '@/lib/client';
 import {
   renderPromoVideo, downloadVideo, RenderResult, VIDEO_THEMES, VIDEO_TRANSITIONS,
-  VIDEO_FORMAT_STYLES, ASPECT_RATIOS, VideoFormatStyle, AspectRatioType, TransitionType, VideoScene
+  VIDEO_FORMAT_STYLES, ASPECT_RATIOS, TYPOGRAPHY_STYLES, TypographyStyle, VideoFormatStyle, AspectRatioType, TransitionType, VideoScene
 } from '@/lib/video';
 
 interface Scene {
@@ -51,11 +51,35 @@ function buildContextualScenePrompt(scene: Scene, productDesc: string, category:
   const visual = (scene.visual || '').trim();
   const shotType = (scene.shot_type || '').toLowerCase();
   const vLower = visual.toLowerCase();
+  const pLower = (productDesc || '').toLowerCase();
+  const cLower = (category || '').toLowerCase();
 
   // Strip generic video camera directions to keep prompt clean for image generation
   const cleanedVisual = visual
     .replace(/^(camera fixed on|camera pans across|camera zooms into|camera follows|camera tilt to|slow tilt to|medium close-up of|close-up of|wide shot of|over-the-shoulder shot of|macro shot of)\s*/i, '')
     .trim();
+
+  // Food, Fast Food, Cafe, Dining Context
+  const isFood =
+    cLower.includes('food') || cLower.includes('dining') || cLower.includes('kitchen') || cLower.includes('bakery') ||
+    vLower.includes('burger') || vLower.includes('fries') || vLower.includes('truffle') || vLower.includes('pizza') ||
+    vLower.includes('dish') || vLower.includes('biryani') || vLower.includes('curry') || vLower.includes('meal') ||
+    vLower.includes('beverage') || vLower.includes('shake') || vLower.includes('cake') || vLower.includes('snack') ||
+    pLower.includes('burger') || pLower.includes('fries') || pLower.includes('food') || pLower.includes('pizza') || pLower.includes('truffle');
+
+  if (isFood) {
+    return `Vertical 9:16 appetizing commercial food advertising photograph: ${cleanedVisual}. Featuring ${productDesc || 'gourmet food'}, mouthwatering food styling, sizzling steam and juices, crispy golden textures, commercial studio lighting, 8k resolution, razor-sharp focus, pristine food presentation, NO human face`;
+  }
+
+  // Jewellery & Gold Context
+  const isJewellery =
+    cLower.includes('jewel') || cLower.includes('gold') ||
+    vLower.includes('jewel') || vLower.includes('bangle') || vLower.includes('necklace') || vLower.includes('ring') ||
+    pLower.includes('jewel') || pLower.includes('gold') || pLower.includes('diamond');
+
+  if (isJewellery) {
+    return `Vertical 9:16 luxury commercial jewellery advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'fine jewellery'}, 22k pure gold craftsmanship, uncut diamond sparkle, velvet showcase styling, dramatic studio lighting, 8k resolution, razor-sharp focus, NO human face`;
+  }
 
   // Explicit face portrait ONLY when the shot is an explicit presenter / talking-head without product action
   const isExplicitPresenterFace =
@@ -67,11 +91,8 @@ function buildContextualScenePrompt(scene: Scene, productDesc: string, category:
     !vLower.includes('serum') &&
     !vLower.includes('cream') &&
     !vLower.includes('pour') &&
-    !vLower.includes('jewellery') &&
-    !vLower.includes('bangles') &&
-    !vLower.includes('necklace') &&
-    !vLower.includes('food') &&
-    !vLower.includes('dish');
+    !vLower.includes('saree') &&
+    !vLower.includes('dress');
 
   if (isExplicitPresenterFace) {
     return `Vertical 9:16 commercial advertising still: charismatic Indian brand creator smiling warmly at camera in modern luxury studio, presenting ${productDesc || 'the brand'}, cinematic soft lighting, 8k photorealistic, professional portrait`;
@@ -96,7 +117,7 @@ function buildContextualScenePrompt(scene: Scene, productDesc: string, category:
     return `Vertical 9:16 macro commercial advertising photograph: ${cleanedVisual}, showcasing ${productDesc || 'the product'}. Focus on hands, texture, glistening droplets and packaging detail, luxury studio lighting, aesthetic depth of field, 8k resolution, photorealistic commercial still`;
   }
 
-  // Pure product showcase / packaging / jewellery / food (NO human face when not requested!)
+  // Pure product showcase / packaging / apparel
   return `Vertical 9:16 commercial product advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'the product'}, ${category || 'Premium Brand'} commercial styling, pristine studio lighting, elegant reflection, high-end packaging detail, crisp 8k photorealistic, no human face`;
 }
 
@@ -141,15 +162,38 @@ function VideoGeneratorInner() {
   const [selectedFormat, setSelectedFormat] = useState<VideoFormatStyle>('motionExplainer');
   const [selectedAspect, setSelectedAspect] = useState<AspectRatioType>('9:16');
   const [selectedTheme, setSelectedTheme] = useState<string>('royalGold');
+  const [selectedTypography, setSelectedTypography] = useState<TypographyStyle>('impactSans');
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>('crossfade');
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
+
+  // Scene editing
+  const [editingSceneIdx, setEditingSceneIdx] = useState<number | null>(null);
+  const [editSceneForm, setEditSceneForm] = useState<Scene | null>(null);
+
+  // Auto-countdown timer for cooldown status
+  useEffect(() => {
+    if (cooldownSec <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSec((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSec]);
 
   // Load script and form from previous step
   useEffect(() => {
     try {
       const savedScript: VideoScript | null = JSON.parse(sessionStorage.getItem('gm_video_result') || 'null');
-      const savedImages: (string | undefined)[] = JSON.parse(sessionStorage.getItem('gm_scene_images') || '[]');
+      const savedScriptTitle = sessionStorage.getItem('gm_scene_images_script');
+      let savedImages: (string | undefined)[] = [];
+
+      // Only load cached images if they match this exact script title and business
+      if (savedScript && savedScriptTitle && savedScriptTitle === savedScript.title) {
+        savedImages = JSON.parse(sessionStorage.getItem('gm_scene_images') || '[]');
+      } else {
+        // Discard stale images from different script or old campaigns
+        sessionStorage.removeItem('gm_scene_images');
+      }
 
       if (savedScript && savedScript.scenes && savedScript.scenes.length > 0) {
         setScriptData(savedScript);
@@ -165,37 +209,37 @@ function VideoGeneratorInner() {
           {
             scene_number: 1,
             duration_seconds: 4,
-            shot_type: 'Opening Hook & Face',
-            visual: 'Camera fixed on owner face smiling holding product',
-            voiceover: 'Tired of dull skin and dark spots?',
-            text_overlay: 'Dull Skin? Dark Spots?',
+            shot_type: 'Opening Hook',
+            visual: 'Crispy gourmet burger and golden truffle fries on wooden board',
+            voiceover: 'Craving the juiciest burger in town?',
+            text_overlay: 'Best Burgers in Town 🍔',
             music_mood: 'Upbeat',
           },
           {
             scene_number: 2,
             duration_seconds: 5,
             shot_type: 'Product Macro',
-            visual: 'Amber serum bottle with saffron glistening in studio light',
-            voiceover: 'Meet 10% Kumkumadi Radiance Face Serum, packed with saffron & sandalwood.',
-            text_overlay: '10% Kumkumadi Radiance',
+            visual: 'Melted cheese dripping over seasoned grilled patties with crisp lettuce',
+            voiceover: 'Crafted with 100% prime ingredients and secret smoky sauce.',
+            text_overlay: '100% Fresh & Sizzling',
             music_mood: 'Upbeat',
           },
           {
             scene_number: 3,
             duration_seconds: 5,
-            shot_type: 'Demonstration & Application',
-            visual: 'Applying a few drops on fingertips onto cheek in soft focus',
-            voiceover: 'Apply a few drops daily morning and night on clean skin.',
-            text_overlay: 'Apply Daily AM & PM',
+            shot_type: 'Side Dish Focus',
+            visual: 'Golden parmesan truffle fries tossed with fresh herbs in basket',
+            voiceover: 'Served hot with our signature garlic aioli and crunchy fries.',
+            text_overlay: 'Loaded Truffle Fries 🍟',
             music_mood: 'Upbeat',
           },
           {
             scene_number: 4,
             duration_seconds: 5,
-            shot_type: 'Results & Call to Action',
-            visual: 'Radiant glowing skin in natural sunlight with product',
-            voiceover: 'In just 7 days, get that 24-hour glass skin glow. Order today!',
-            text_overlay: '7-Day Glass Skin Glow',
+            shot_type: 'Call to Action',
+            visual: 'Full burger combo meal spread with refreshing cold beverage',
+            voiceover: 'Order now on Swiggy & Zomato or visit us today for 20% off!',
+            text_overlay: 'Flat 20% Off Today',
             music_mood: 'Upbeat',
           },
         ]);
@@ -205,7 +249,23 @@ function VideoGeneratorInner() {
       if (savedForm) {
         if (savedForm.businessName) setBusinessName(savedForm.businessName);
         if (savedForm.productDescription) setProductDesc(savedForm.productDescription);
-        if (savedForm.category) setCategory(savedForm.category);
+        if (savedForm.category) {
+          setCategory(savedForm.category);
+          const cLow = savedForm.category.toLowerCase();
+          if (cLow.includes('food') || cLow.includes('dining') || cLow.includes('kitchen') || cLow.includes('bakery')) {
+            setSelectedTheme('kitchenSpice');
+            setSelectedTypography('impactSans');
+          } else if (cLow.includes('jewel') || cLow.includes('gold')) {
+            setSelectedTheme('royalGold');
+            setSelectedTypography('luxurySerif');
+          } else if (cLow.includes('fashion') || cLow.includes('boutique') || cLow.includes('saree')) {
+            setSelectedTheme('boutiqueRose');
+            setSelectedTypography('modernChic');
+          } else if (cLow.includes('tech') || cLow.includes('mobile')) {
+            setSelectedTheme('cyberBlue');
+            setSelectedTypography('boldNeon');
+          }
+        }
       }
     } catch {
       /* ignore */
@@ -217,9 +277,40 @@ function VideoGeneratorInner() {
     try {
       const imagesArr = updatedScenes.map((s) => s.image);
       sessionStorage.setItem('gm_scene_images', JSON.stringify(imagesArr));
+      if (scriptData?.title) {
+        sessionStorage.setItem('gm_scene_images_script', scriptData.title);
+      }
     } catch {
       /* quota */
     }
+  };
+
+  // Clear all scene visuals to start fresh
+  const clearAllVisuals = () => {
+    setScenes((prev) => prev.map((s) => ({ ...s, image: undefined })));
+    try {
+      sessionStorage.removeItem('gm_scene_images');
+      sessionStorage.removeItem('gm_scene_images_script');
+    } catch { /* ignore */ }
+    toast('All scene visuals cleared — ready for fresh generation!', 'ai');
+  };
+
+  // Scene editing helpers
+  const startEditScene = (idx: number) => {
+    setEditingSceneIdx(idx);
+    setEditSceneForm({ ...scenes[idx] });
+  };
+
+  const saveEditedScene = () => {
+    if (editingSceneIdx === null || !editSceneForm) return;
+    setScenes((prev) => {
+      const updated = prev.map((s, idx) => (idx === editingSceneIdx ? { ...editSceneForm } : s));
+      saveSceneImages(updated);
+      return updated;
+    });
+    setEditingSceneIdx(null);
+    setEditSceneForm(null);
+    toast('Scene updated successfully!', 'ai');
   };
 
   // Stop or pause the batch generation queue
@@ -250,10 +341,11 @@ function VideoGeneratorInner() {
 
       if (res.status === 429 || data.error === 'RATE_LIMIT') {
         const waitTime = data.retryAfter || 40;
+        setCooldownSec(waitTime);
         setScenes((prev) =>
           prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: false } : s))
         );
-        toast(`Free AI cooldown active: next visual ready in ${waitTime}s.`, 'ai');
+        // Quietly update top display — no popup toast
         return { success: false, retryAfter: waitTime };
       }
 
@@ -369,6 +461,7 @@ function VideoGeneratorInner() {
       const res = await renderPromoVideo(
         {
           businessName,
+          category,
           cta: scriptData?.cta || 'Order Now',
           scenes: sceneList,
           voiceover: voiceOn
@@ -379,6 +472,7 @@ function VideoGeneratorInner() {
               }
             : null,
           paletteId: selectedTheme,
+          fontStyle: selectedTypography,
           transition: selectedTransition,
           videoStyle: selectedFormat,
           aspect: selectedAspect,
@@ -509,11 +603,28 @@ function VideoGeneratorInner() {
           </div>
         </div>
 
-        {scriptData && (
-          <div className="px-3 py-1.5 rounded-xl bg-[color-mix(in_srgb,var(--neon)_10%,transparent)] border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] text-xs text-[var(--neon)] max-w-md truncate">
-            🎬 Storyboard: <span className="font-semibold text-[var(--text)]">{scriptData.title || businessName} ({scenes.length} Scenes)</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Top AI Engine Status Badge */}
+          <div className="flex items-center gap-2">
+            {cooldownSec > 0 ? (
+              <div className="px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-xs font-semibold text-amber-300 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>AI Cooldown: Wait {cooldownSec}s</span>
+              </div>
+            ) : (
+              <div className="px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-xs font-semibold text-emerald-300 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>AI Engine: Ready</span>
+              </div>
+            )}
           </div>
-        )}
+
+          {scriptData && (
+            <div className="px-3 py-1.5 rounded-xl bg-[color-mix(in_srgb,var(--neon)_10%,transparent)] border border-[color-mix(in_srgb,var(--neon)_25%,transparent)] text-xs text-[var(--neon)] max-w-md truncate">
+              🎬 Storyboard: <span className="font-semibold text-[var(--text)]">{scriptData.title || businessName} ({scenes.length} Scenes)</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8 items-start">
@@ -531,25 +642,39 @@ function VideoGeneratorInner() {
                 </p>
               </div>
 
-              {/* 1-Click AI Full Workflow Button */}
-              {batchBusy ? (
-                <Button
-                  size="sm"
-                  variant="subtle"
-                  onClick={stopBatch}
-                  className="shadow-md text-xs font-semibold text-amber-300 border border-amber-500/40 hover:bg-amber-500/20"
-                >
-                  <Pause size={12} className="mr-1" /> Pause Queue ({batchStep}/{scenes.length})
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={generateAllSceneVisuals}
-                  className="shadow-md text-xs font-semibold"
-                >
-                  <Wand2 size={13} className="mr-1" /> 1-Click: Generate All {scenes.length} Visuals ✨
-                </Button>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {readyImagesCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllVisuals}
+                    disabled={batchBusy}
+                    className="text-[11px] text-[var(--text-muted)] hover:text-[var(--danger)] px-2.5 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--card)] transition-colors flex items-center gap-1"
+                    title="Clear previous images to start fresh"
+                  >
+                    <RefreshCw size={11} /> Reset Visuals
+                  </button>
+                )}
+
+                {/* 1-Click AI Full Workflow Button */}
+                {batchBusy ? (
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    onClick={stopBatch}
+                    className="shadow-md text-xs font-semibold text-amber-300 border border-amber-500/40 hover:bg-amber-500/20"
+                  >
+                    <Pause size={12} className="mr-1" /> Pause Queue ({batchStep}/{scenes.length})
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={generateAllSceneVisuals}
+                    className="shadow-md text-xs font-semibold"
+                  >
+                    <Wand2 size={13} className="mr-1" /> 1-Click: Generate All {scenes.length} Visuals ✨
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Active Batch Queue Status Banner */}
@@ -624,26 +749,107 @@ function VideoGeneratorInner() {
                       <span className="text-[10px] text-[var(--text-faint)]">{scene.duration_seconds}s</span>
                     </div>
 
-                    <p className="text-[10px] text-[var(--text-muted)] line-clamp-2 mt-0.5">
-                      <strong>Visual:</strong> {scene.visual}
-                    </p>
+                    {/* Scene Edit Drawer or Normal View */}
+                    {editingSceneIdx === idx ? (
+                      <div className="mt-2 p-3 rounded-lg border border-[var(--neon)] bg-[var(--card)] space-y-2 text-xs animate-fade-in">
+                        <div>
+                          <label className="text-[10px] text-[var(--neon)] block font-semibold mb-0.5">Edit Visual Description / Scene Content:</label>
+                          <textarea
+                            value={editSceneForm?.visual || ''}
+                            onChange={(e) => setEditSceneForm((prev) => prev ? { ...prev, visual: e.target.value } : null)}
+                            rows={2}
+                            className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded p-1.5 text-xs text-[var(--text)] focus:border-[var(--neon)] outline-none"
+                            placeholder="e.g. Juicy double patty cheeseburger with loaded truffle fries and garlic aioli dip"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-[var(--text-soft)] block font-semibold mb-0.5">Headline Overlay:</label>
+                            <input
+                              value={editSceneForm?.text_overlay || ''}
+                              onChange={(e) => setEditSceneForm((prev) => prev ? { ...prev, text_overlay: e.target.value } : null)}
+                              className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded p-1.5 text-xs text-[var(--text)] focus:border-[var(--neon)] outline-none"
+                              placeholder="e.g. Loaded Truffle Fries 🍟"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-[var(--text-soft)] block font-semibold mb-0.5">Duration (sec):</label>
+                            <input
+                              type="number"
+                              min={2}
+                              max={10}
+                              value={editSceneForm?.duration_seconds || 4}
+                              onChange={(e) => setEditSceneForm((prev) => prev ? { ...prev, duration_seconds: Number(e.target.value) } : null)}
+                              className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded p-1.5 text-xs text-[var(--text)] focus:border-[var(--neon)] outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-[var(--text-soft)] block font-semibold mb-0.5">Spoken Voiceover Line:</label>
+                          <input
+                            value={editSceneForm?.voiceover || ''}
+                            onChange={(e) => setEditSceneForm((prev) => prev ? { ...prev, voiceover: e.target.value } : null)}
+                            className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded p-1.5 text-xs text-[var(--text)] focus:border-[var(--neon)] outline-none"
+                            placeholder="Spoken narration for this shot..."
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 justify-end pt-1">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingSceneIdx(null); setEditSceneForm(null); }}
+                            className="px-2.5 py-1 rounded border border-[var(--border)] text-[10px] text-[var(--text-soft)] hover:text-white"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveEditedScene}
+                            className="px-3 py-1 rounded bg-[var(--neon)] text-black font-semibold text-[10px]"
+                          >
+                            ✓ Save Scene
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-[10px] text-[var(--text-muted)] line-clamp-2 mt-0.5">
+                          <strong>Visual:</strong> {scene.visual}
+                        </p>
 
-                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-[var(--gold)] truncate">
-                      <span className="font-semibold">Overlay:</span> &ldquo;{scene.text_overlay}&rdquo;
-                    </div>
+                        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-[var(--gold)] truncate">
+                          <span className="font-semibold">Overlay:</span> &ldquo;{scene.text_overlay}&rdquo;
+                        </div>
+                      </>
+                    )}
 
                     {/* Scene Action Buttons */}
-                    <div className="mt-2 flex items-center gap-2 pt-1 border-t border-[var(--border)]">
+                    <div className="mt-2 flex items-center gap-2 pt-1 border-t border-[var(--border)] flex-wrap">
+                      {cooldownSec > 0 && !scene.generating ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="text-[10px] text-amber-400/90 font-medium flex items-center gap-1 cursor-not-allowed"
+                        >
+                          <span>⏳ Wait {cooldownSec}s</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => generateSceneVisual(idx)}
+                          disabled={scene.generating || batchBusy}
+                          className="text-[10px] text-[var(--accent-soft)] hover:underline flex items-center gap-1 font-medium"
+                        >
+                          <RefreshCw size={10} className={scene.generating ? 'animate-spin' : ''} />
+                          {scene.generating ? 'Generating…' : (scene.image ? 'Re-roll AI' : 'Generate Visual')}
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        onClick={() => generateSceneVisual(idx)}
-                        disabled={scene.generating || batchBusy}
-                        className="text-[10px] text-[var(--accent-soft)] hover:underline flex items-center gap-1 font-medium"
+                        onClick={() => startEditScene(idx)}
+                        className="text-[10px] text-[var(--neon)] hover:underline flex items-center gap-1 font-medium"
                       >
-                        <RefreshCw size={10} className={scene.generating ? 'animate-spin' : ''} />
-                        {scene.generating
-                          ? (cooldownSec > 0 ? `Ready in ${cooldownSec}s…` : 'Generating…')
-                          : (scene.image ? 'Re-roll AI' : 'Generate Visual')}
+                        ✏️ Edit Scene
                       </button>
 
                       <label className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer flex items-center gap-1 ml-auto">
@@ -705,7 +911,7 @@ function VideoGeneratorInner() {
                   <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
                     <Palette size={13} className="text-[var(--gold)]" /> Design Theme Palette
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {VIDEO_THEMES.map((theme) => {
                       const isSelected = selectedTheme === theme.id;
                       return (
@@ -755,6 +961,33 @@ function VideoGeneratorInner() {
                         >
                           <span className="text-[11px] font-bold block text-[var(--text)] truncate">{fs.name}</span>
                           <span className="text-[9px] text-[var(--text-muted)] block truncate">{fs.badge}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Typography & Font Mood Selector */}
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                  <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-[var(--neon)]" /> Typography & Font Mood
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TYPOGRAPHY_STYLES.map((ts) => {
+                      const isSelected = selectedTypography === ts.id;
+                      return (
+                        <button
+                          key={ts.id}
+                          type="button"
+                          onClick={() => setSelectedTypography(ts.id)}
+                          className={`p-2 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? 'border-[var(--neon)] bg-[color-mix(in_srgb,var(--neon)_12%,transparent)] font-semibold shadow-sm'
+                              : 'border-[var(--border)] bg-[var(--input-bg)] hover:border-[var(--border-strong)]'
+                          }`}
+                        >
+                          <span className="text-[11px] font-bold block text-[var(--text)] truncate">{ts.name}</span>
+                          <span className="text-[9px] text-[var(--text-muted)] block truncate">{ts.desc}</span>
                         </button>
                       );
                     })}

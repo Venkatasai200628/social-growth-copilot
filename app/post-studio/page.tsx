@@ -45,13 +45,26 @@ interface PostData {
 }
 
 /* ── Poster stage: renders via lib/poster engine ─────────────── */
-function PosterStage({ result, brand, city, photo }: { result: PostData; brand: string; city?: string; photo: string | null }) {
+function PosterStage({
+  result,
+  brand,
+  city,
+  photo,
+  onPhotoChange,
+}: {
+  result: PostData;
+  brand: string;
+  city?: string;
+  photo: string | null;
+  onPhotoChange?: (p: string | null) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [format, setFormat] = useState<PosterFormat>('1:1');
   const [paletteId, setPaletteId] = useState(result.poster.palette);
   const [customColor, setCustomColor] = useState('#8b5cf6');
   const [layout, setLayout] = useState<PosterLayout>((result.poster.layout as PosterLayout) || 'modern');
   const [fontsReady, setFontsReady] = useState(false);
+  const [activePhoto, setActivePhoto] = useState<string | null>(photo || result.image_url);
   const [phone, setPhone] = useState('');
   const [waMsg, setWaMsg] = useState(result.whatsapp_message);
   const toast = useToast();
@@ -62,7 +75,11 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
     return () => { alive = false; };
   }, []);
 
-  useEffect(() => { setPaletteId(result.poster.palette); setLayout((result.poster.layout as PosterLayout) || 'modern'); }, [result]);
+  useEffect(() => {
+    setPaletteId(result.poster.palette);
+    setLayout((result.poster.layout as PosterLayout) || 'modern');
+    setActivePhoto(photo || result.image_url);
+  }, [result, photo]);
 
   const draw = useCallback(async () => {
     if (!canvasRef.current || !fontsReady) return;
@@ -74,9 +91,9 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
       offer: result.poster.offer_text,
       brand: brand || 'Your Brand',
       city,
-      photo,
+      photo: activePhoto,
     });
-  }, [format, layout, paletteId, result, brand, city, photo, fontsReady]);
+  }, [format, layout, paletteId, result, brand, city, activePhoto, fontsReady]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -94,6 +111,20 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
     return new Blob([arr], { type: 'image/png' });
   };
 
+  const handleItemPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setActivePhoto(reader.result);
+        onPhotoChange?.(reader.result);
+        toast('Item photo updated on poster! ✨', 'ai');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="space-y-4">
       {/* format + controls */}
@@ -106,6 +137,42 @@ function PosterStage({ result, brand, city, photo }: { result: PostData; brand: 
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={download}><Download size={13} />PNG</Button>
         </div>
+      </div>
+
+      {/* Hero Product / Item Visual Control Bar */}
+      <div className="p-3 rounded-xl border border-[var(--border)] bg-[var(--card)] flex items-center justify-between gap-3 flex-wrap text-xs">
+        {activePhoto ? (
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={activePhoto} alt="Product visual" className="w-10 h-10 object-cover rounded-lg border border-[var(--border)] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[var(--text)] truncate">Hero Item Photo Active</p>
+              <p className="text-[10px] text-[var(--text-muted)] truncate">Product image is composed directly into poster</p>
+            </div>
+            <label className="px-2.5 py-1 rounded-lg bg-[var(--input-bg)] border border-[var(--border)] text-[11px] text-[var(--text-soft)] hover:text-white cursor-pointer font-medium">
+              Change Item Photo
+              <input type="file" accept="image/*" onChange={handleItemPhotoUpload} className="hidden" />
+            </label>
+            <button
+              type="button"
+              onClick={() => { setActivePhoto(null); onPhotoChange?.(null); }}
+              className="text-[11px] text-[var(--danger)] hover:underline ml-1"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 flex-1">
+            <div>
+              <p className="font-semibold text-[var(--text)]">Typographic Poster Mode</p>
+              <p className="text-[10px] text-[var(--text-muted)]">Upload a photo of your product (burger, jewellery, dish) to feature it as the hero visual</p>
+            </div>
+            <label className="px-3 py-1.5 rounded-lg bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] border border-[color-mix(in_srgb,var(--accent)_30%,transparent)] text-xs text-[var(--accent-soft)] hover:text-white cursor-pointer flex items-center gap-1.5 font-medium shrink-0">
+              <Upload size={12} /> Upload Product Photo
+              <input type="file" accept="image/*" onChange={handleItemPhotoUpload} className="hidden" />
+            </label>
+          </div>
+        )}
       </div>
 
       {/* poster + IG context preview */}
@@ -507,7 +574,13 @@ function PostStudioInner() {
 
                 {tab === 'poster' && (
                   <Card className="p-4 animate-fade-in">
-                    <PosterStage result={result} brand={form.businessName} city={form.city} photo={photo} />
+                    <PosterStage
+                      result={result}
+                      brand={form.businessName}
+                      city={form.city}
+                      photo={photo || result.image_url}
+                      onPhotoChange={setPhoto}
+                    />
                   </Card>
                 )}
 
