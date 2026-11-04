@@ -353,7 +353,7 @@ export default function LandingPage() {
           {[
             { icon: Languages, title: 'Multilingual Voice Input', desc: 'Speak naturally in Hindi, Tamil, Telugu, Marathi or English; outputs ready-to-post English campaigns.' },
             { icon: Sparkles, title: 'Authentic Indian Aesthetics', desc: 'Curated color palettes and festive motifs tuned for local festivals, wedding seasons, and retail promotions.' },
-            { icon: ShieldCheck, title: 'Meta AI Open Intelligence', desc: 'Enterprise-grade reasoning powered by Llama 3.3 70B, Meta SAM segmentation, and Llama Guard safety.' },
+            { icon: ShieldCheck, title: 'Meta Model API & Muse Intelligence', desc: 'Enterprise-grade reasoning powered by Meta Muse Spark, Muse Wonder, Muse Code, and SAM 3.1.' },
             { icon: Store, title: 'Direct Business Ownership', desc: 'Zero agency retainers. Full ownership of all generated visual graphics, video reels, and scripts.' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-start gap-3.5">
@@ -550,7 +550,7 @@ export default function LandingPage() {
           <p className="text-xs text-[var(--text-faint)]">© 2026 GrowMitra · Built for Indian Retailers & Creators</p>
           <div className="flex gap-6 text-xs text-[var(--text-faint)]">
             <a href="mailto:hello@growmitra.app" className="hover:text-[var(--text-muted)] transition-colors">Contact</a>
-            <span>Meta Open AI Hackathon Edition</span>
+            <span>Meta Global AI Developer Hackathon Edition</span>
           </div>
         </div>
       </footer>

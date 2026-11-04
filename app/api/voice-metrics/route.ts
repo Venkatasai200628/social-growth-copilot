@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatJSON } from '@/lib/groq';
+import { chatJSON } from '@/lib/meta-ai';
 import { requireAuth } from '@/lib/auth-guard';
 import { languagePrompt } from '@/lib/india';
 import { readJson, badRequest } from '../_lib/http';

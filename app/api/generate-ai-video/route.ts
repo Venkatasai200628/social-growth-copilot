@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     recordMetaAITrace({
       feature: 'Generative AI Video (Image-to-Video)',
-      model: 'Meta SAM & Lightricks LTX Diffusion',
+      model: 'meta/sam-3.1 & ltx-video',
       latencyMs,
       promptSample: promptText,
       intent: 'Physical camera sweep and subject motion generation',

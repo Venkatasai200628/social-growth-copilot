@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatJSON } from '@/lib/groq';
+import { chatJSON } from '@/lib/meta-ai';
 import { languagePrompt, festivalPrompt } from '@/lib/india';
 import { requireAuth } from '@/lib/auth-guard';
 import { CATEGORIES, GOALS } from '@/lib/types';

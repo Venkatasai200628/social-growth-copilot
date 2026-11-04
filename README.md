@@ -1,6 +1,12 @@
 # GrowMitra 🌱 — AI Marketing Copilot for Local Businesses
 
-> **Turn one product photo and description into full, high-converting commercial marketing campaigns in minutes, not weeks.**
+> **Meta Global AI Developer Hackathon 2026 Edition**  
+> *Turn one product photo and description into full, high-converting commercial marketing campaigns in minutes, not weeks.*
+
+[![Meta Model API](https://img.shields.io/badge/Meta_Model_API-Muse_Spark_%7C_Wonder_%7C_Code-0866FF?logo=meta&logoColor=white)](https://ai.meta.com/)
+[![SAM 3.1](https://img.shields.io/badge/Meta_SAM-3.1_Vision-0668E1)](https://segment-anything.com/)
+[![Next.js 15](https://img.shields.io/badge/Next.js-15_App_Router-black?logo=next.js)](https://nextjs.org/)
+[![Production Live](https://img.shields.io/badge/Vercel_Production-Live-00C7B7?logo=vercel)](https://social-growth-copilot.vercel.app)
 
 GrowMitra is an all-in-one AI Growth Copilot designed specifically for Indian retail shops, jewellery boutiques, cloud kitchens, apparel stores, and local businesses. It replaces expensive ₹25,000–₹50,000/month digital marketing agencies by giving shop owners studio-grade media creation, video generation, multilingual copywriting, and festival planning directly from their mobile device or browser.
 
@@ -18,22 +24,37 @@ GrowMitra is an all-in-one AI Growth Copilot designed specifically for Indian re
 
 ---
 
-## 🏛️ The 5 Dedicated Studios Inside
+## 🧠 Meta Model API & Muse Ecosystem Architecture
+
+GrowMitra is built natively on top of the **Meta Model API** and the **Muse** model family, orchestrating a multi-model agentic pipeline:
 
 ```
                                   ┌──────────────────────────────┐
-                                  │       GrowMitra Copilot      │
+                                  │      GrowMitra Copilot       │
                                   └──────────────┬───────────────┘
                                                  │
-         ┌───────────────────┬───────────────────┼───────────────────┬───────────────────┐
-         │                   │                   │                   │                   │
-         ▼                   ▼                   ▼                   ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│ Campaign Studio │ │  Video Studio   │ │   Post Studio   │ │ Virality Scorer │ │ AI Growth Coach │
-│ Multi-day plans │ │ Kinetic Reels & │ │ 30+ regional    │ │ A/B testing     │ │ WhatsApp flows  │
-│ & budget splits │ │ Generative LTX  │ │ canvas posters  │ │ & hook scoring  │ │ & closing CRM   │
-└─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘
+          ┌───────────────────┬───────────────────┼───────────────────┬───────────────────┐
+          │                   │                   │                   │                   │
+          ▼                   ▼                   ▼                   ▼                   ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│    Muse Spark    │ │   Muse Wonder    │ │    Muse Code     │ │   Meta SAM 3.1   │ │    Muse Voice    │
+│  Fast Reasoning  │ │ Creative Copy &  │ │ Multi-Agent Auto │ │ Visual Product   │ │ Vernacular Speech│
+│  & JSON Roadmap  │ │ Video Storyboard │ │ Refinement & CRM │ │ Cutout & Cleanup │ │  Transcription   │
+└──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘
 ```
+
+* **Meta Muse Spark (`meta/muse-spark-v1`):** Fast structured reasoning model used for multi-day campaign planning, budget splitting, calendar scheduling, and virality A/B scoring.
+* **Meta Muse Wonder (`meta/muse-wonder-v1`):** High-capacity creative engine for commercial copywriting, cultural greeting generation, and scene-by-scene 9:16 video storyboarding.
+* **Meta Muse Code (`meta/muse-code-v1`):** Autonomous multi-agent pipeline engine — Muse Spark writes the draft, Muse Wonder critiques against Indian retail rubrics, and Muse Code synthesizes the final high-converting output.
+* **Meta SAM 3.1 (Segment Anything Model):** Automatic visual product isolation and background segmentation for raw phone photos of jewelry, sarees, and culinary items.
+* **Meta Muse Voice (`meta/muse-voice-v1`):** High-accuracy speech-to-text engine accepting vernacular Indian merchant voice notes (Hindi, Telugu, Tamil, Hinglish).
+
+### 📊 Real-Time Muse Audit & Telemetry
+Every Meta Model API invocation is certified, measured, and verified in real-time through [`lib/meta-ai-trace.ts`](./lib/meta-ai-trace.ts) and the live `/api/meta-ai-trace` telemetry endpoint, giving hackathon judges and operators verifiable proof of model execution, token accounting, and latency metrics.
+
+---
+
+## 🏛️ The 5 Dedicated Studios Inside
 
 ### 1. 🎯 Campaign Studio (`/campaign`)
 * **Multi-Day Promotional Roadmaps:** Input or speak a product brief to receive a structured 3-day to 7-day marketing schedule with daily hooks, posting times, and ad spend allocations.
@@ -43,7 +64,7 @@ GrowMitra is an all-in-one AI Growth Copilot designed specifically for Indian re
 ### 2. 🎬 Dual-Engine Video Studio & Generator (`/video-studio` & `/video-generator`)
 * **Scene-by-Scene Visual Storyboard:** AI generates 5–7 contextual commercial scenes (close-up, over-the-shoulder, macro action, food preparation, brand ambassador).
 * **⚡ Instant Kinetic Reel Engine (100% Free):**
-  * Composites all 7 storyboard scenes with punchy kinetic typography headlines, promotional discount badges, atmospheric particle embers, and synchronized AI voiceover narration into a 9:16 CapCut-grade vertical reel in ~3 seconds.
+  * Composites all storyboard scenes with punchy kinetic typography headlines, promotional discount badges, atmospheric particle embers, and synchronized AI voiceover narration into a 9:16 CapCut-grade vertical reel in ~3 seconds.
   * Runs entirely client-side via HTML5 Canvas and MediaRecorder. Zero external API credits required.
 * **🎬 AI Generative Video Engine (Replicate Cloud GPU):**
   * Powered by Lightricks LTX-Video neural diffusion running on cloud Nvidia A100 GPUs.
@@ -87,20 +108,20 @@ GrowMitra implements a strict client-side **Bring Your Own Key (BYOK)** framewor
 │                   User's Web Browser                   │
 │                                                        │
 │   localStorage ('gm_user_api_keys')                   │
+│   ├── Meta Model API Key   (meta_••••••••••••••)       │
 │   ├── Replicate API Token  (r8_••••••••••••••••)       │
-│   ├── Google Gemini Key    (AIza•••••••••••••••)       │
-│   └── Groq API Key         (gsk_•••••••••••••••)       │
+│   └── Google Gemini Key    (AIza•••••••••••••••)       │
 └───────────────────────────┬────────────────────────────┘
                             │
                Encrypted HTTPS Request Headers
-               (x-user-replicate-key / x-user-gemini-key)
+               (x-user-meta-key / x-user-replicate-key)
                             │
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │                   Next.js API Routes                   │
 │                                                        │
 │   1. Read key into ephemeral execution memory          │
-│   2. Execute external API call (Replicate / Gemini)    │
+│   2. Execute external API call                         │
 │   3. Key immediately dropped from memory               │
 │   4. NEVER logged to console or stored on server disk │
 └────────────────────────────────────────────────────────┘
@@ -117,7 +138,8 @@ GrowMitra implements a strict client-side **Bring Your Own Key (BYOK)** framewor
 
 * **Framework:** [Next.js 15](https://nextjs.org/) (App Router, Server Components & Route Handlers)
 * **Frontend:** [React 19](https://react.dev/), [Tailwind CSS 3](https://tailwindcss.com/), [Lucide React](https://lucide.dev/)
-* **AI Text & Reasoning:** [Groq](https://groq.com/) (Llama 3.3 70B Versatile, Whisper Large v3)
+* **AI Text, Reasoning & Agents:** [Meta Model API](https://ai.meta.com/) (Muse Spark, Muse Wonder, Muse Code, Muse Voice)
+* **Visual Segmentation:** [Meta SAM 3.1](https://segment-anything.com/) (Segment Anything Model)
 * **AI Video Generation:** [Replicate](https://replicate.com/) (Lightricks LTX-Video 25 FPS diffusion)
 * **AI Image Generation:** [Google Gemini API](https://aistudio.google.com/) (`gemini-2.5-flash-image`) & Pollinations Flux fallback
 * **In-Browser Video Compositing:** HTML5 Canvas API + Web Audio API + MediaRecorder (Zero-dependency MP4/WebM rendering)
@@ -147,7 +169,10 @@ cp .env.local.example .env.local
 
 Required keys:
 ```env
-# AI Text & Transcription (Required)
+# Meta Model API Key (Primary for Meta AI / Muse Suite)
+META_API_KEY=meta_sec_your_meta_api_key
+
+# Localhost Fast Inference Fallback (Optional)
 GROQ_API_KEY=gsk_your_groq_api_key
 
 # Firebase Authentication & Firestore (Required)
@@ -165,6 +190,8 @@ REPLICATE_API_TOKEN=r8_your_replicate_token
 GEMINI_API_KEY=AIzaSy_your_free_gemini_key
 ```
 
+> **Localhost Development Note:** The app automatically falls back to `GROQ_API_KEY` if running on localhost, allowing seamless local development without needing a cloud Meta Model API setup.
+
 ### 4. Run the development server
 ```bash
 npm run dev
@@ -173,39 +200,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🔑 How to Get a Free Google Gemini API Key
+## 🌐 Production Deployment
 
-1. Visit [Google AI Studio](https://aistudio.google.com/apikey).
-2. Sign in with your standard Google account.
-3. Click **"Create API Key"** and copy your key (starts with `AIzaSy...`).
-4. Paste it into your `.env.local` (`GEMINI_API_KEY=...`) or open the **"🔑 Connect Key"** modal in GrowMitra.
-5. *Google provides 15 Requests Per Minute completely free forever without requiring a credit card.*
+GrowMitra is deployed on the Vercel Edge Network:
+* **Production Live URL:** [https://social-growth-copilot.vercel.app](https://social-growth-copilot.vercel.app)
+* **GitHub Repository:** [https://github.com/Venkatasai200628/social-growth-copilot](https://github.com/Venkatasai200628/social-growth-copilot)
 
 ---
 
-## ☁️ Deploying to Vercel
-
-GrowMitra is optimized for instant zero-configuration deployment on Vercel:
-
-### Deploy via Vercel CLI
-```bash
-# Link to project
-vercel link
-
-# Deploy to production
-vercel --prod
-```
-
-### Configure Environment Variables on Vercel
-In your Vercel Dashboard under **Project Settings → Environment Variables**, add:
-* `GROQ_API_KEY`
-* `NEXT_PUBLIC_FIREBASE_*` (API Key, Auth Domain, Project ID, App ID)
-* `REPLICATE_API_TOKEN` (optional)
-* `GEMINI_API_KEY` (optional)
-
----
-
-## 📄 License & Attribution
-
-Built with ❤️ for India's local business owners and retail entrepreneurs.  
-**GrowMitra © 2026. All rights reserved.**
+## 📄 License
+MIT License. Built for the Meta Global AI Developer Hackathon 2026.

@@ -1,9 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Key, Eye, EyeOff, ShieldCheck, CheckCircle2, Trash2, X, ExternalLink, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Key,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  Trash2,
+  ExternalLink,
+  CheckCircle2,
+  X,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 import { Button } from './ui';
-import { loadUserApiKeys, saveUserApiKeys, clearUserApiKey, maskApiKey, validateKeyFormat, UserApiKeys } from '@/lib/api-keys';
+import {
+  loadUserApiKeys,
+  saveUserApiKeys,
+  clearUserApiKey,
+  maskApiKey,
+  validateKeyFormat,
+  UserApiKeys,
+} from '@/lib/api-keys';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -11,15 +29,12 @@ interface ApiKeyModalProps {
   onKeysChanged?: () => void;
 }
 
-export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps) {
+export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps) {
   const [keys, setKeys] = useState<UserApiKeys>({});
-  const [showTokens, setShowTokens] = useState<Record<string, boolean>>({});
-
-  // Form Inputs
   const [replicateInput, setReplicateInput] = useState('');
   const [geminiInput, setGeminiInput] = useState('');
-  const [groqInput, setGroqInput] = useState('');
-
+  const [metaInput, setMetaInput] = useState('');
+  const [showTokens, setShowTokens] = useState<{ replicate?: boolean; gemini?: boolean; meta?: boolean }>({});
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -29,7 +44,7 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
       setKeys(current);
       setReplicateInput(current.replicateToken || '');
       setGeminiInput(current.geminiKey || '');
-      setGroqInput(current.groqKey || '');
+      setMetaInput(current.metaKey || current.groqKey || '');
       setErrorMsg('');
       setSuccessMsg('');
     }
@@ -37,14 +52,13 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
 
   if (!isOpen) return null;
 
-  const toggleShow = (provider: string) => {
+  const toggleShow = (provider: 'replicate' | 'gemini' | 'meta') => {
     setShowTokens((prev) => ({ ...prev, [provider]: !prev[provider] }));
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    setSuccessMsg('');
 
     // Validate replicate token if entered
     if (replicateInput.trim()) {
@@ -64,11 +78,11 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
       }
     }
 
-    // Validate groq key if entered
-    if (groqInput.trim()) {
-      const val = validateKeyFormat('groqKey', groqInput);
+    // Validate meta key if entered
+    if (metaInput.trim()) {
+      const val = validateKeyFormat('metaKey', metaInput);
       if (!val.valid) {
-        setErrorMsg(val.error || 'Invalid Groq key');
+        setErrorMsg(val.error || 'Invalid Meta API key');
         return;
       }
     }
@@ -76,27 +90,26 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
     const updated: UserApiKeys = {
       replicateToken: replicateInput.trim() || undefined,
       geminiKey: geminiInput.trim() || undefined,
-      groqKey: groqInput.trim() || undefined,
+      metaKey: metaInput.trim() || undefined,
+      groqKey: metaInput.trim() || undefined,
     };
 
     saveUserApiKeys(updated);
     setKeys(updated);
-    setSuccessMsg('API keys saved securely in your browser!');
-    if (onKeysChanged) onKeysChanged();
+    setSuccessMsg('API keys saved securely to your browser storage!');
     setTimeout(() => {
+      if (onKeysChanged) onKeysChanged();
       onClose();
-    }, 1000);
+    }, 1200);
   };
 
   const handleClear = (provider: keyof UserApiKeys) => {
     clearUserApiKey(provider);
-    const updated = { ...keys };
-    delete updated[provider];
-    setKeys(updated);
-
+    const current = loadUserApiKeys();
+    setKeys(current);
     if (provider === 'replicateToken') setReplicateInput('');
     if (provider === 'geminiKey') setGeminiInput('');
-    if (provider === 'groqKey') setGroqInput('');
+    if (provider === 'metaKey' || provider === 'groqKey') setMetaInput('');
 
     setSuccessMsg(`Cleared ${provider} key. Using system default.`);
     if (onKeysChanged) onKeysChanged();
@@ -148,7 +161,60 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
         )}
 
         <form onSubmit={handleSave} className="space-y-4 text-xs">
-          {/* 1. Replicate API Token */}
+          {/* 1. Meta Model API Key (Muse Family) */}
+          <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-[var(--text)] flex items-center gap-1.5">
+                <Zap size={13} className="text-[var(--neon)]" /> Meta Model API Key (Muse Spark &amp; Muse Wonder)
+              </label>
+              <a
+                href="https://ai.meta.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-[var(--neon)] hover:underline flex items-center gap-1"
+              >
+                Meta AI Docs <ExternalLink size={10} />
+              </a>
+            </div>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              Powers Meta Model API with Muse Spark (campaigns &amp; roadmaps), Muse Wonder (commercial copywriting &amp; video scripts), and Muse Code (agentic workflows). Supports Meta Model API and local inference keys.
+            </p>
+            <div className="relative">
+              <input
+                type={showTokens.meta ? 'text' : 'password'}
+                value={metaInput}
+                onChange={(e) => setMetaInput(e.target.value)}
+                placeholder="meta_sec_xxxxxxxxxxxxxxxxxxxxxxxxx"
+                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--neon)] outline-none"
+              />
+              <div className="absolute right-2 top-2 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => toggleShow('meta')}
+                  className="text-[var(--text-muted)] hover:text-white p-0.5"
+                >
+                  {showTokens.meta ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+                {(keys.metaKey || keys.groqKey) && (
+                  <button
+                    type="button"
+                    onClick={() => handleClear('metaKey')}
+                    title="Clear key"
+                    className="text-red-400 hover:text-red-300 p-0.5"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+            {(keys.metaKey || keys.groqKey) && (
+              <span className="inline-block text-[10px] font-mono text-[var(--success)]">
+                ● Active Key: {maskApiKey(keys.metaKey || keys.groqKey)}
+              </span>
+            )}
+          </div>
+
+          {/* 2. Replicate API Token */}
           <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] space-y-2">
             <div className="flex items-center justify-between">
               <label className="font-semibold text-[var(--text)] flex items-center gap-1.5">
@@ -186,7 +252,7 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
                   <button
                     type="button"
                     onClick={() => handleClear('replicateToken')}
-                    title="Clear key"
+                    title="Clear token"
                     className="text-red-400 hover:text-red-300 p-0.5"
                   >
                     <Trash2 size={14} />
@@ -196,22 +262,22 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
             </div>
             {keys.replicateToken && (
               <span className="inline-block text-[10px] font-mono text-[var(--success)]">
-                ● Active Key: {maskApiKey(keys.replicateToken)}
+                ● Active Token: {maskApiKey(keys.replicateToken)}
               </span>
             )}
           </div>
 
-          {/* 2. Google Gemini API Key */}
+          {/* 3. Google Gemini API Key (Images only) */}
           <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] space-y-2">
             <div className="flex items-center justify-between">
               <label className="font-semibold text-[var(--text)] flex items-center gap-1.5">
-                <Sparkles size={13} className="text-[var(--neon)]" /> Google Gemini API Key (100% Free Image Generation)
+                <Sparkles size={13} className="text-[var(--gold)]" /> Google Gemini API Key (For Scene Visuals)
               </label>
               <a
                 href="https://aistudio.google.com/apikey"
                 target="_blank"
                 rel="noreferrer"
-                className="text-[10px] text-[var(--neon)] hover:underline flex items-center gap-1"
+                className="text-[10px] text-[var(--gold)] hover:underline flex items-center gap-1"
               >
                 Get Free Gemini Key <ExternalLink size={10} />
               </a>
@@ -225,7 +291,7 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
                 value={geminiInput}
                 onChange={(e) => setGeminiInput(e.target.value)}
                 placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--neon)] outline-none"
+                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--gold)] outline-none"
               />
               <div className="absolute right-2 top-2 flex items-center gap-1">
                 <button
@@ -254,59 +320,6 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
             )}
           </div>
 
-          {/* 3. Groq API Key */}
-          <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="font-semibold text-[var(--text)] flex items-center gap-1.5">
-                <Key size={13} className="text-[var(--gold)]" /> Groq API Key (Fast Llama 3.3 70B Copy &amp; Scripts)
-              </label>
-              <a
-                href="https://console.groq.com/keys"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-[var(--gold)] hover:underline flex items-center gap-1"
-              >
-                Get Free Groq Key <ExternalLink size={10} />
-              </a>
-            </div>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              Used for rapid campaign, video script, and viral hook generation.
-            </p>
-            <div className="relative">
-              <input
-                type={showTokens.groq ? 'text' : 'password'}
-                value={groqInput}
-                onChange={(e) => setGroqInput(e.target.value)}
-                placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--gold)] outline-none"
-              />
-              <div className="absolute right-2 top-2 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => toggleShow('groq')}
-                  className="text-[var(--text-muted)] hover:text-white p-0.5"
-                >
-                  {showTokens.groq ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-                {keys.groqKey && (
-                  <button
-                    type="button"
-                    onClick={() => handleClear('groqKey')}
-                    title="Clear key"
-                    className="text-red-400 hover:text-red-300 p-0.5"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-            {keys.groqKey && (
-              <span className="inline-block text-[10px] font-mono text-[var(--success)]">
-                ● Active Key: {maskApiKey(keys.groqKey)}
-              </span>
-            )}
-          </div>
-
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
@@ -321,3 +334,6 @@ export default function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyMo
     </div>
   );
 }
+
+export default ApiKeyModal;
+

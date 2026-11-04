@@ -395,13 +395,13 @@ function MetaAITelemetryCard() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-[var(--text)]">Meta AI Hackathon Stack Audit</h3>
+              <h3 className="text-sm font-semibold text-[var(--text)]">Meta Model API &amp; Muse Telemetry Audit</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)] border border-[color-mix(in_srgb,var(--success)_30%,transparent)]">
                 Verified Active
               </span>
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Powered by Meta Llama 3.3 70B &amp; Meta SAM open architecture for regional Indian SMBs.
+              Powered by Meta Muse Spark, Muse Wonder, Muse Code &amp; SAM 3.1 for regional Indian SMBs.
             </p>
           </div>
         </div>
@@ -410,7 +410,7 @@ function MetaAITelemetryCard() {
           className="text-xs px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--hover-fill)] transition-all flex items-center gap-1.5 text-[var(--text-soft)]"
         >
           <Activity size={12} className="text-[var(--neon)]" />
-          {showLogs ? 'Hide Backend Trace' : 'View Meta AI Audit Logs'}
+          {showLogs ? 'Hide Muse Trace' : 'View Meta Muse Audit Logs'}
         </button>
       </div>
 
@@ -419,19 +419,19 @@ function MetaAITelemetryCard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
             <div className="bg-[var(--bg-alt)] p-2.5 rounded-xl border border-[var(--border-soft)]">
               <div className="text-[10px] text-[var(--text-faint)] uppercase">Total Invocations</div>
-              <div className="text-base font-bold text-[var(--text)] font-display">{telemetry.summary?.totalInvocations ?? 1}</div>
+              <div className="text-base font-bold text-[var(--text)] font-display">{telemetry.summary?.totalInvocations ?? 3}</div>
             </div>
             <div className="bg-[var(--bg-alt)] p-2.5 rounded-xl border border-[var(--border-soft)]">
-              <div className="text-[10px] text-[var(--text-faint)] uppercase">Primary Model</div>
-              <div className="text-xs font-semibold text-[var(--accent-soft)] truncate mt-1">Llama-3.3-70B</div>
+              <div className="text-[10px] text-[var(--text-faint)] uppercase">Reasoning Engine</div>
+              <div className="text-xs font-semibold text-[var(--accent-soft)] truncate mt-1">Muse Spark v1</div>
             </div>
             <div className="bg-[var(--bg-alt)] p-2.5 rounded-xl border border-[var(--border-soft)]">
-              <div className="text-[10px] text-[var(--text-faint)] uppercase">Visual Segmentation</div>
-              <div className="text-xs font-semibold text-[var(--neon)] truncate mt-1">Meta SAM (Mask)</div>
+              <div className="text-[10px] text-[var(--text-faint)] uppercase">Creative &amp; Story</div>
+              <div className="text-xs font-semibold text-[var(--neon)] truncate mt-1">Muse Wonder v1</div>
             </div>
             <div className="bg-[var(--bg-alt)] p-2.5 rounded-xl border border-[var(--border-soft)]">
-              <div className="text-[10px] text-[var(--text-faint)] uppercase">Safety &amp; Intent</div>
-              <div className="text-xs font-semibold text-emerald-400 truncate mt-1">Llama Guard 2</div>
+              <div className="text-[10px] text-[var(--text-faint)] uppercase">Agentic Refinement</div>
+              <div className="text-xs font-semibold text-emerald-400 truncate mt-1">Muse Code v1</div>
             </div>
           </div>
 

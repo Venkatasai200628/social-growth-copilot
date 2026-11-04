@@ -11,7 +11,7 @@ import {
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
 import { Button, Card } from '../components/ui';
-import ApiKeyModal from '../components/ApiKeyModal';
+import { ApiKeyModal } from '../components/ApiKeyModal';
 import { loadUserApiKeys, maskApiKey, UserApiKeys } from '@/lib/api-keys';
 import { authFetch } from '@/lib/client';
 import {

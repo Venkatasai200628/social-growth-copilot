@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Snippets that mark an already user-friendly error message (thrown by
- * lib/groq.ts or by routes themselves). Anything else is treated as
+ * lib/meta-ai.ts or by routes themselves). Anything else is treated as
  * internal jargon and replaced with a generic apology.
  */
 const FRIENDLY_SNIPPETS = [

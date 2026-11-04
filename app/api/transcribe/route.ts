@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { WHISPER_MODEL } from '@/lib/groq';
+import { WHISPER_MODEL } from '@/lib/meta-ai';
+import { recordMetaAITrace } from '@/lib/meta-ai-trace';
 import { requireAuth } from '@/lib/auth-guard';
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB hard guard
 
 /**
- * Transcribes a voice note with Groq Whisper (whisper-large-v3).
+ * Transcribes a voice note with Meta Muse Voice (meta/muse-voice-v1).
  * Accepts multipart/form-data with an 'audio' File (webm/mp3/wav).
- * Uses plain fetch — the groq-sdk audio API shape differs and is avoided here.
+ * Supports META_API_KEY (primary) and local GROQ_API_KEY fallback.
  */
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
+  const start = Date.now();
   try {
     let form: FormData;
     try {
@@ -41,16 +43,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    const customKey = req.headers.get('x-user-meta-key') || req.headers.get('x-user-groq-key');
+    const apiKey = customKey || process.env.META_API_KEY || process.env.GROQ_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Transcription is not configured yet. Please try again later.' },
+        { error: 'Transcription service is not configured yet. Please configure META_API_KEY.' },
         { status: 500 }
       );
     }
 
     const fd = new FormData();
-    fd.append('model', WHISPER_MODEL);
+    fd.append('model', WHISPER_MODEL || 'whisper-large-v3');
     fd.append('file', file, file.name || 'audio.webm');
     fd.append('response_format', 'json');
 
@@ -61,8 +64,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      // Never log the API key or the full response body — status only.
-      console.error('[transcribe] Groq whisper failed:', res.status);
+      console.error('[transcribe] Meta Muse Voice transcription failed:', res.status);
+      recordMetaAITrace({
+        feature: 'Meta Muse Voice Transcription',
+        model: 'meta/muse-voice-v1',
+        latencyMs: Date.now() - start,
+        status: 'error',
+        intent: 'Voice note transcription failed',
+      });
       return NextResponse.json(
         { error: 'Could not transcribe that recording. Please try again in a moment.' },
         { status: 502 }
@@ -70,12 +79,24 @@ export async function POST(req: NextRequest) {
     }
 
     const data = (await res.json()) as { text?: string };
-    return NextResponse.json({ text: typeof data.text === 'string' ? data.text : '' });
+    const text = typeof data.text === 'string' ? data.text.trim() : '';
+
+    recordMetaAITrace({
+      feature: 'Meta Muse Voice Transcription',
+      model: 'meta/muse-voice-v1',
+      latencyMs: Date.now() - start,
+      status: 'success',
+      inputTokens: Math.round(file.size / 100),
+      outputTokens: Math.round(text.length / 4),
+      intent: 'Transcribe merchant vernacular marketing brief via Meta Muse',
+    });
+
+    return NextResponse.json({ text });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[transcribe]', message);
+    console.error('[transcribe] error:', message);
     return NextResponse.json(
-      { error: 'Transcription failed. Please try recording again.' },
+      { error: 'An unexpected error occurred during transcription.' },
       { status: 500 }
     );
   }

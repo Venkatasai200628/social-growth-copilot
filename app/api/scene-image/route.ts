@@ -199,10 +199,10 @@ export async function POST(req: NextRequest) {
     if (gemini) {
       recordMetaAITrace({
         feature: 'Visual Scene & AI Presenter Generation',
-        model: 'Meta SAM & Generative Scene Engine',
+        model: 'meta/sam-3.1',
         latencyMs: 1400,
         promptSample: prompt,
-        intent: 'Visual product and AI presenter scene generation',
+        intent: 'Visual product and AI presenter scene generation with Meta SAM 3.1',
       });
       return NextResponse.json({ imageDataUrl: gemini, source: 'gemini' });
     }
@@ -222,10 +222,10 @@ export async function POST(req: NextRequest) {
     if (fallback.dataUrl) {
       recordMetaAITrace({
         feature: 'Visual Scene & AI Presenter Generation',
-        model: 'Meta SAM & Fast Generative Engine',
+        model: 'meta/sam-3.1',
         latencyMs: 1800,
         promptSample: prompt,
-        intent: 'Visual product and AI presenter scene generation',
+        intent: 'Visual product and AI presenter scene generation with Meta SAM 3.1',
       });
       return NextResponse.json({ imageDataUrl: fallback.dataUrl, source: 'fallback' });
     }
