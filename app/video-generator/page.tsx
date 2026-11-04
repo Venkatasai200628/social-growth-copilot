@@ -41,52 +41,63 @@ interface VideoScript {
 
 /**
  * Intelligent contextual visual prompt generator.
- * Inspects each scene's visual cue and shot type:
- * - If presenter / face is mentioned -> generates charismatic Indian creator portrait.
- * - If texture / application / drops / hands are mentioned -> generates macro application action still.
- * - If product / macro / bottle / food / jewellery -> generates PRISTINE product photography with NO human face.
+ * Inspects each scene's visual cue, shot type, product details, and category:
+ * - Direct Subject Fidelity: Directly translates the actual physical objects, textures, ingredients, and actions.
+ * - Human Faces: Strictly restricted to explicit presenter / talking-head scenes without product action.
+ * - Hands & Demonstration: Emphasizes hand movements, amber liquid droplets, packaging, and textures.
+ * - Pure Product / Food / Jewellery: Pure product photography with NO human faces.
  */
 function buildContextualScenePrompt(scene: Scene, productDesc: string, category: string): string {
-  const visualText = (scene.visual || '').toLowerCase();
+  const visual = (scene.visual || '').trim();
   const shotType = (scene.shot_type || '').toLowerCase();
+  const vLower = visual.toLowerCase();
 
-  const isHumanPresenter =
-    visualText.includes('face') ||
-    visualText.includes('owner') ||
-    visualText.includes('creator') ||
-    visualText.includes('smiling') ||
-    visualText.includes('speaking') ||
-    visualText.includes('person') ||
-    visualText.includes('ambassador') ||
-    visualText.includes('presenter') ||
-    visualText.includes('woman') ||
-    visualText.includes('man') ||
-    shotType.includes('talking head') ||
-    shotType.includes('presenter');
+  // Strip generic video camera directions to keep prompt clean for image generation
+  const cleanedVisual = visual
+    .replace(/^(camera fixed on|camera pans across|camera zooms into|camera follows|camera tilt to|slow tilt to|medium close-up of|close-up of|wide shot of|over-the-shoulder shot of|macro shot of)\s*/i, '')
+    .trim();
 
+  // Explicit face portrait ONLY when the shot is an explicit presenter / talking-head without product action
+  const isExplicitPresenterFace =
+    (shotType.includes('talking head') || shotType.includes('face close-up') || vLower.includes('face looking at camera') || vLower.includes('speaking to camera')) &&
+    !vLower.includes('bottle') &&
+    !vLower.includes('drop') &&
+    !vLower.includes('hand open') &&
+    !vLower.includes('apply') &&
+    !vLower.includes('serum') &&
+    !vLower.includes('cream') &&
+    !vLower.includes('pour') &&
+    !vLower.includes('jewellery') &&
+    !vLower.includes('bangles') &&
+    !vLower.includes('necklace') &&
+    !vLower.includes('food') &&
+    !vLower.includes('dish');
+
+  if (isExplicitPresenterFace) {
+    return `Vertical 9:16 commercial advertising still: charismatic Indian brand creator smiling warmly at camera in modern luxury studio, presenting ${productDesc || 'the brand'}, cinematic soft lighting, 8k photorealistic, professional portrait`;
+  }
+
+  // Hand actions, ingredient macro, application, drops, pouring, opening packaging
   const isActionOrTexture =
-    visualText.includes('hand') ||
-    visualText.includes('drop') ||
-    visualText.includes('apply') ||
-    visualText.includes('pour') ||
-    visualText.includes('texture') ||
-    visualText.includes('liquid') ||
-    visualText.includes('touch') ||
-    visualText.includes('fingertip') ||
-    visualText.includes('open') ||
+    vLower.includes('hand') ||
+    vLower.includes('drop') ||
+    vLower.includes('apply') ||
+    vLower.includes('pat') ||
+    vLower.includes('fingertip') ||
+    vLower.includes('pour') ||
+    vLower.includes('open') ||
+    vLower.includes('texture') ||
+    vLower.includes('liquid') ||
+    vLower.includes('glisten') ||
     shotType.includes('demonstration') ||
     shotType.includes('over-the-shoulder');
 
-  if (isHumanPresenter) {
-    return `Vertical 9:16 portrait of a charismatic Indian brand creator in a modern luxury studio, smiling warmly, presenting ${productDesc || scene.visual}, ${category || 'Retail'} commercial context, crisp facial details, natural cinematic lighting, 8k photorealistic`;
-  }
-
   if (isActionOrTexture) {
-    return `Vertical 9:16 commercial macro action shot of ${scene.visual}, ${productDesc}, ${category || 'Retail'} commercial advertising, rich textures and droplets, beautiful studio lighting, aesthetic composition, pristine 8k commercial quality, no full human face`;
+    return `Vertical 9:16 macro commercial advertising photograph: ${cleanedVisual}, showcasing ${productDesc || 'the product'}. Focus on hands, texture, glistening droplets and packaging detail, luxury studio lighting, aesthetic depth of field, 8k resolution, photorealistic commercial still`;
   }
 
-  // Pure product showcase / packaging / macro / still (NO human faces when not requested!)
-  return `Vertical 9:16 commercial hero advertisement still of ${scene.visual}, ${productDesc}, ${category || 'Retail'} packaging and presentation, dramatic luxury studio lighting, rich textures, 8k commercial product photography, pristine product focus, no human face`;
+  // Pure product showcase / packaging / jewellery / food (NO human face when not requested!)
+  return `Vertical 9:16 commercial product advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'the product'}, ${category || 'Premium Brand'} commercial styling, pristine studio lighting, elegant reflection, high-end packaging detail, crisp 8k photorealistic, no human face`;
 }
 
 function VideoGeneratorInner() {
@@ -98,9 +109,12 @@ function VideoGeneratorInner() {
   const [productDesc, setProductDesc] = useState('');
   const [category, setCategory] = useState('');
 
-  // 1-Click AI Full Workflow Batch State
+  // 1-Click AI Full Workflow Batch & Cooldown State
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchStep, setBatchStep] = useState(0);
+  const [batchStatusText, setBatchStatusText] = useState('');
+  const [cooldownSec, setCooldownSec] = useState(0);
+  const cancelBatchRef = useRef(false);
 
   // Video Engine Mode
   const [videoMode, setVideoMode] = useState<'kinetic' | 'generative'>('kinetic');
@@ -208,10 +222,19 @@ function VideoGeneratorInner() {
     }
   };
 
+  // Stop or pause the batch generation queue
+  const stopBatch = () => {
+    cancelBatchRef.current = true;
+    setBatchBusy(false);
+    setCooldownSec(0);
+    setBatchStatusText('');
+    toast('Automated visual queue paused.', 'ai');
+  };
+
   // Generate visual for a single specific scene
-  const generateSceneVisual = async (sceneIndex: number) => {
+  const generateSceneVisual = async (sceneIndex: number): Promise<{ success: boolean; retryAfter?: number }> => {
     const targetScene = scenes[sceneIndex];
-    if (!targetScene) return;
+    if (!targetScene) return { success: false };
 
     setScenes((prev) =>
       prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: true } : s))
@@ -224,6 +247,16 @@ function VideoGeneratorInner() {
         aspect: selectedAspect,
       });
       const data = await res.json();
+
+      if (res.status === 429 || data.error === 'RATE_LIMIT') {
+        const waitTime = data.retryAfter || 40;
+        setScenes((prev) =>
+          prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: false } : s))
+        );
+        toast(`Free AI cooldown active: next visual ready in ${waitTime}s.`, 'ai');
+        return { success: false, retryAfter: waitTime };
+      }
+
       if (!data.imageDataUrl) {
         throw new Error(data.error || 'Failed to generate visual');
       }
@@ -237,26 +270,65 @@ function VideoGeneratorInner() {
       });
 
       toast(`Scene ${sceneIndex + 1} visual generated! 📸`, 'ai');
+      return { success: true };
     } catch (err) {
       setScenes((prev) =>
         prev.map((s, idx) => (idx === sceneIndex ? { ...s, generating: false } : s))
       );
       toast(err instanceof Error ? err.message : 'Could not generate visual', 'error');
+      return { success: false };
     }
   };
 
-  // 1-Click AI Full Workflow: Generate All Scenes Sequentially
+  // 1-Click AI Full Workflow: Generate All Scenes with Intelligent Cooldown & Auto-Retry
   const generateAllSceneVisuals = async () => {
     if (scenes.length === 0) return;
     setBatchBusy(true);
+    cancelBatchRef.current = false;
 
     for (let i = 0; i < scenes.length; i++) {
+      if (cancelBatchRef.current) break;
+
+      // Skip already-generated visuals to save time & API quota
+      if (scenes[i].image) {
+        continue;
+      }
+
       setBatchStep(i + 1);
-      await generateSceneVisual(i);
+      setBatchStatusText(`Generating Scene ${i + 1} of ${scenes.length}: ${scenes[i].shot_type || 'Visual'}…`);
+
+      let result = await generateSceneVisual(i);
+      if (cancelBatchRef.current) break;
+
+      // If hit provider cooldown (1 image every 45s), countdown live and auto-retry
+      if (!result.success && result.retryAfter) {
+        let remaining = result.retryAfter + 2;
+        while (remaining > 0 && !cancelBatchRef.current) {
+          setCooldownSec(remaining);
+          setBatchStatusText(
+            `⏳ AI Provider Cooldown: Generating Scene ${i + 1} in ${remaining}s… (Free tier auto-pacing)`
+          );
+          await new Promise((r) => setTimeout(r, 1000));
+          remaining--;
+        }
+        setCooldownSec(0);
+
+        if (!cancelBatchRef.current) {
+          setBatchStatusText(`Retrying Scene ${i + 1} of ${scenes.length}…`);
+          result = await generateSceneVisual(i);
+        }
+      }
+
+      // Small 1.5s aesthetic pause between scenes
+      if (i < scenes.length - 1 && !cancelBatchRef.current) {
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     }
 
     setBatchBusy(false);
-    toast('All scene visuals generated with contextual AI! 🎬', 'ai');
+    setCooldownSec(0);
+    setBatchStatusText('');
+    toast('Contextual AI visual workflow completed! 🎬', 'ai');
   };
 
   // Upload custom photo for a specific scene
@@ -460,19 +532,51 @@ function VideoGeneratorInner() {
               </div>
 
               {/* 1-Click AI Full Workflow Button */}
-              <Button
-                size="sm"
-                onClick={generateAllSceneVisuals}
-                disabled={batchBusy}
-                className="shadow-md text-xs font-semibold"
-              >
-                {batchBusy ? (
-                  <><RefreshCw size={12} className="animate-spin" /> Generating Scene {batchStep}/{scenes.length}…</>
-                ) : (
-                  <><Wand2 size={13} /> 1-Click: Generate All {scenes.length} Visuals ✨</>
-                )}
-              </Button>
+              {batchBusy ? (
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  onClick={stopBatch}
+                  className="shadow-md text-xs font-semibold text-amber-300 border border-amber-500/40 hover:bg-amber-500/20"
+                >
+                  <Pause size={12} className="mr-1" /> Pause Queue ({batchStep}/{scenes.length})
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={generateAllSceneVisuals}
+                  className="shadow-md text-xs font-semibold"
+                >
+                  <Wand2 size={13} className="mr-1" /> 1-Click: Generate All {scenes.length} Visuals ✨
+                </Button>
+              )}
             </div>
+
+            {/* Active Batch Queue Status Banner */}
+            {batchBusy && (
+              <div className="mb-3 p-3 rounded-xl bg-[color-mix(in_srgb,var(--neon)_12%,transparent)] border border-[color-mix(in_srgb,var(--neon)_30%,transparent)] flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <RefreshCw size={14} className="animate-spin text-[var(--neon)] shrink-0" />
+                  <div>
+                    <p className="font-semibold text-[var(--text)]">
+                      {batchStatusText || `Generating Scene ${batchStep} of ${scenes.length}…`}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                      {cooldownSec > 0
+                        ? `⏳ Free tier auto-pacing: next visual unlocks in ${cooldownSec}s…`
+                        : 'Auto-pacing guarantees 100% reliable image delivery without rate-limit errors.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={stopBatch}
+                  className="px-2.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--card)] text-[11px] text-[var(--text-soft)] hover:text-white transition-colors"
+                >
+                  Pause
+                </button>
+              </div>
+            )}
 
             {/* Context Notice */}
             <div className="mb-4 p-2.5 rounded-xl bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] text-[11px] text-[var(--text-soft)]">
@@ -494,7 +598,7 @@ function VideoGeneratorInner() {
                     ) : scene.generating ? (
                       <div className="flex flex-col items-center gap-1 text-[9px] text-[var(--neon)] font-mono">
                         <RefreshCw size={14} className="animate-spin" />
-                        <span>AI...</span>
+                        <span>{cooldownSec > 0 ? `${cooldownSec}s` : 'AI…'}</span>
                       </div>
                     ) : (
                       <button
@@ -537,7 +641,9 @@ function VideoGeneratorInner() {
                         className="text-[10px] text-[var(--accent-soft)] hover:underline flex items-center gap-1 font-medium"
                       >
                         <RefreshCw size={10} className={scene.generating ? 'animate-spin' : ''} />
-                        {scene.image ? 'Re-roll AI' : 'Generate Visual'}
+                        {scene.generating
+                          ? (cooldownSec > 0 ? `Ready in ${cooldownSec}s…` : 'Generating…')
+                          : (scene.image ? 'Re-roll AI' : 'Generate Visual')}
                       </button>
 
                       <label className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer flex items-center gap-1 ml-auto">

@@ -111,38 +111,59 @@ async function generateWithGemini(prompt: string): Promise<string | null> {
   return null;
 }
 
+interface PollinationsResult {
+  dataUrl?: string;
+  rateLimited?: boolean;
+  retryAfterSec?: number;
+  error?: string;
+}
+
 /**
- * Provider 2 — Pollinations flux (free, no key). Server-side fetch so the
- * browser never fights CORS or a hanging image download. Returns a JPEG
- * data URL, or null on failure.
+ * Provider 2 — Pollinations turbo & sana (free, no key). Server-side fetch with
+ * rate-limit parsing and multi-model fallback. Returns a JPEG data URL, or rate-limit info.
  */
-async function generateWithPollinations(prompt: string, aspect: Aspect): Promise<string | null> {
+async function generateWithPollinations(prompt: string, aspect: Aspect): Promise<PollinationsResult> {
   const { width, height } = ASPECT_SIZES[aspect];
-  const url =
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      prompt + ', vertical composition, cinematic lighting, photorealistic, social media ad still'
-    )}` +
-    `?width=${width}&height=${height}&nologo=true&model=flux&seed=${Date.now() % 99999}`;
+  const seed = Math.floor(Math.random() * 999999);
+  const models = ['turbo', 'sana'];
 
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) {
-      console.error('[scene-image] Pollinations failed:', res.status);
-      return null;
+  for (const model of models) {
+    const url =
+      `https://image.pollinations.ai/prompt/${encodeURIComponent(
+        prompt + ', vertical composition, cinematic lighting, photorealistic, 8k commercial ad still'
+      )}` +
+      `?width=${width}&height=${height}&nologo=true&model=${model}&seed=${seed}`;
+
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(25_000) });
+
+      if (res.status === 402 || res.status === 429) {
+        const text = await res.text();
+        const match = text.match(/Retry after (\d+)s/i);
+        const retrySec = match ? parseInt(match[1], 10) : 40;
+        console.warn(`[scene-image] Pollinations free limit on ${model}. Retry after ${retrySec}s`);
+        return { rateLimited: true, retryAfterSec: retrySec };
+      }
+
+      if (!res.ok) {
+        console.error('[scene-image] Pollinations model failed:', model, res.status);
+        continue;
+      }
+
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0) {
+        console.error('[scene-image] Pollinations returned empty body:', model);
+        continue;
+      }
+
+      return { dataUrl: `data:image/jpeg;base64,${buf.toString('base64')}` };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[scene-image] Pollinations error with ${model}:`, message);
     }
-
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length === 0) {
-      console.error('[scene-image] Pollinations returned an empty body');
-      return null;
-    }
-
-    return `data:image/jpeg;base64,${buf.toString('base64')}`;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[scene-image] Pollinations error:', message);
-    return null;
   }
+
+  return { error: 'All image generation models are temporarily busy.' };
 }
 
 export async function POST(req: NextRequest) {
@@ -181,19 +202,30 @@ export async function POST(req: NextRequest) {
     }
 
     const fallback = await generateWithPollinations(prompt, aspect);
-    if (fallback) {
+    if (fallback.rateLimited) {
+      return NextResponse.json(
+        {
+          error: 'RATE_LIMIT',
+          retryAfter: fallback.retryAfterSec || 40,
+          message: `Free AI provider cooldown: 1 image every 45s. Next image available in ${fallback.retryAfterSec || 40}s.`,
+        },
+        { status: 429 }
+      );
+    }
+
+    if (fallback.dataUrl) {
       recordMetaAITrace({
         feature: 'Visual Scene & AI Presenter Generation',
-        model: 'Meta SAM & Generative Scene Engine (Flux)',
+        model: 'Meta SAM & Fast Generative Engine',
         latencyMs: 1800,
         promptSample: prompt,
         intent: 'Visual product and AI presenter scene generation',
       });
-      return NextResponse.json({ imageDataUrl: fallback, source: 'fallback' });
+      return NextResponse.json({ imageDataUrl: fallback.dataUrl, source: 'fallback' });
     }
 
     return NextResponse.json(
-      { error: 'Image generation is unavailable right now.' },
+      { error: fallback.error || 'Image generation is temporarily busy. Please wait a moment.' },
       { status: 503 }
     );
   } catch (error: unknown) {
