@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Film, ArrowLeft, Download, RefreshCw, Sparkles, Upload, Wand2, Mic,
   Monitor, AlertCircle, Zap, Clapperboard,
-  CheckCircle2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2
+  CheckCircle2, Camera, Palette, Layout, Play, Pause, Volume2, VolumeX, Maximize2, HelpCircle
 } from 'lucide-react';
 import AuthGuard from '../components/AuthGuard';
 import { useToast } from '../components/Toast';
@@ -42,10 +42,9 @@ interface VideoScript {
 /**
  * Intelligent contextual visual prompt generator.
  * Inspects each scene's visual cue, shot type, product details, and category:
- * - Direct Subject Fidelity: Directly translates the actual physical objects, textures, ingredients, and actions.
- * - Human Faces: Strictly restricted to explicit presenter / talking-head scenes without product action.
- * - Hands & Demonstration: Emphasizes hand movements, amber liquid droplets, packaging, and textures.
- * - Pure Product / Food / Jewellery: Pure product photography with NO human faces.
+ * - Natural realism: Accurately renders real actions, natural chef hands, sizzling grill, melting cheese, dripping serum.
+ * - Human presence: Allows hands, chefs, presenters and models naturally whenever appropriate to the context.
+ * - Anti-distortion: Avoids contradictory negative tokens that cause floating cups, lava, or bizarre blobs.
  */
 function buildContextualScenePrompt(scene: Scene, productDesc: string, category: string): string {
   const visual = (scene.visual || '').trim();
@@ -59,66 +58,80 @@ function buildContextualScenePrompt(scene: Scene, productDesc: string, category:
     .replace(/^(camera fixed on|camera pans across|camera zooms into|camera follows|camera tilt to|slow tilt to|medium close-up of|close-up of|wide shot of|over-the-shoulder shot of|macro shot of)\s*/i, '')
     .trim();
 
-  // Food, Fast Food, Cafe, Dining Context
+  // 1. Food, Kitchen, Dining, Burger, Pizza, Bakery Context
   const isFood =
     cLower.includes('food') || cLower.includes('dining') || cLower.includes('kitchen') || cLower.includes('bakery') ||
     vLower.includes('burger') || vLower.includes('fries') || vLower.includes('truffle') || vLower.includes('pizza') ||
     vLower.includes('dish') || vLower.includes('biryani') || vLower.includes('curry') || vLower.includes('meal') ||
     vLower.includes('beverage') || vLower.includes('shake') || vLower.includes('cake') || vLower.includes('snack') ||
+    vLower.includes('patty') || vLower.includes('cheese') || vLower.includes('cheddar') || vLower.includes('grill') ||
     pLower.includes('burger') || pLower.includes('fries') || pLower.includes('food') || pLower.includes('pizza') || pLower.includes('truffle');
 
   if (isFood) {
-    return `Vertical 9:16 appetizing commercial food advertising photograph: ${cleanedVisual}. Featuring ${productDesc || 'gourmet food'}, mouthwatering food styling, sizzling steam and juices, crispy golden textures, commercial studio lighting, 8k resolution, razor-sharp focus, pristine food presentation, NO human face`;
+    const isActionOrChef =
+      vLower.includes('hand') || vLower.includes('sprinkl') || vLower.includes('cheddar') ||
+      vLower.includes('melt') || vLower.includes('patty') || vLower.includes('pour') ||
+      vLower.includes('flip') || vLower.includes('grill') || vLower.includes('dip') ||
+      vLower.includes('cook') || vLower.includes('chef') || vLower.includes('season');
+
+    if (isActionOrChef) {
+      return `Vertical 9:16 authentic commercial food photography: ${cleanedVisual}. Featuring mouthwatering ${productDesc || 'gourmet food'}, genuine human chef hands actively preparing food in a clean modern kitchen, realistic melted cheese dripping, sizzling grill, fresh ingredients, warm culinary studio lighting, photorealistic 8k DSLR photo, sharp focus`;
+    }
+
+    return `Vertical 9:16 appetizing commercial food advertisement photograph: ${cleanedVisual}. Featuring delicious ${productDesc || 'gourmet dish'}, beautifully presented on restaurant dining table, crispy golden textures, fresh garnishes, savory steam, warm culinary ambiance, 8k photorealistic commercial still`;
   }
 
-  // Jewellery & Gold Context
+  // 2. Jewellery & Gold Context
   const isJewellery =
     cLower.includes('jewel') || cLower.includes('gold') ||
     vLower.includes('jewel') || vLower.includes('bangle') || vLower.includes('necklace') || vLower.includes('ring') ||
     pLower.includes('jewel') || pLower.includes('gold') || pLower.includes('diamond');
 
   if (isJewellery) {
-    return `Vertical 9:16 luxury commercial jewellery advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'fine jewellery'}, 22k pure gold craftsmanship, uncut diamond sparkle, velvet showcase styling, dramatic studio lighting, 8k resolution, razor-sharp focus, NO human face`;
+    const hasPerson =
+      vLower.includes('model') || vLower.includes('wear') || vLower.includes('neck') ||
+      vLower.includes('wrist') || vLower.includes('ear') || vLower.includes('hand') ||
+      vLower.includes('face') || vLower.includes('woman') || shotType.includes('over-the-shoulder');
+
+    if (hasPerson) {
+      return `Vertical 9:16 luxury Indian jewellery commercial still: ${cleanedVisual}. Featuring exquisite ${productDesc || 'fine jewellery'}, genuine 22k Indian gold temple craftsmanship, sparkling uncut diamonds, worn gracefully by elegant Indian woman in silk saree, soft royal ambient lighting, high jewelry catalog, 8k photorealistic`;
+    }
+
+    return `Vertical 9:16 luxury commercial jewellery advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'fine jewellery'}, 22k pure gold craftsmanship, uncut diamond sparkle, velvet showcase styling, dramatic studio lighting, 8k resolution, razor-sharp focus`;
   }
 
-  // Explicit face portrait ONLY when the shot is an explicit presenter / talking-head without product action
+  // 3. Skincare, Beauty & Cosmetics Context
+  const isBeauty =
+    cLower.includes('beauty') || cLower.includes('skin') || cLower.includes('cosmetic') ||
+    vLower.includes('serum') || vLower.includes('skin') || vLower.includes('glow') ||
+    vLower.includes('cream') || vLower.includes('bottle') || vLower.includes('dropper') ||
+    pLower.includes('serum') || pLower.includes('cream') || pLower.includes('radiance');
+
+  if (isBeauty) {
+    return `Vertical 9:16 luxury skincare commercial photography: ${cleanedVisual}. Featuring ${productDesc || 'botanical face serum'}, amber glass dropper bottle with glistening golden oil droplets, gentle hands demonstrating application, clean modern marble vanity, radiant glowing skin, soft morning studio lighting, 8k photorealistic`;
+  }
+
+  // 4. Apparel, Boutique & Fashion Context
+  const isFashion =
+    cLower.includes('boutique') || cLower.includes('apparel') || cLower.includes('fashion') || cLower.includes('cloth') ||
+    vLower.includes('saree') || vLower.includes('dress') || vLower.includes('kurti') || vLower.includes('lehenga') ||
+    pLower.includes('saree') || pLower.includes('dress') || pLower.includes('collection');
+
+  if (isFashion) {
+    return `Vertical 9:16 Indian fashion editorial catalog photography: ${cleanedVisual}. Featuring ${productDesc || 'designer ethnic wear'}, elegant silk saree or bridal attire with authentic zari embroidery, graceful Indian model in contemporary boutique studio, soft diffused fashion lighting, 8k photorealistic`;
+  }
+
+  // 5. Explicit Presenter / Talking-Head Face Shot
   const isExplicitPresenterFace =
-    (shotType.includes('talking head') || shotType.includes('face close-up') || vLower.includes('face looking at camera') || vLower.includes('speaking to camera')) &&
-    !vLower.includes('bottle') &&
-    !vLower.includes('drop') &&
-    !vLower.includes('hand open') &&
-    !vLower.includes('apply') &&
-    !vLower.includes('serum') &&
-    !vLower.includes('cream') &&
-    !vLower.includes('pour') &&
-    !vLower.includes('saree') &&
-    !vLower.includes('dress');
+    shotType.includes('talking head') || shotType.includes('face close-up') ||
+    vLower.includes('face looking at camera') || vLower.includes('speaking to camera') || vLower.includes('shop owner smiling');
 
   if (isExplicitPresenterFace) {
     return `Vertical 9:16 commercial advertising still: charismatic Indian brand creator smiling warmly at camera in modern luxury studio, presenting ${productDesc || 'the brand'}, cinematic soft lighting, 8k photorealistic, professional portrait`;
   }
 
-  // Hand actions, ingredient macro, application, drops, pouring, opening packaging
-  const isActionOrTexture =
-    vLower.includes('hand') ||
-    vLower.includes('drop') ||
-    vLower.includes('apply') ||
-    vLower.includes('pat') ||
-    vLower.includes('fingertip') ||
-    vLower.includes('pour') ||
-    vLower.includes('open') ||
-    vLower.includes('texture') ||
-    vLower.includes('liquid') ||
-    vLower.includes('glisten') ||
-    shotType.includes('demonstration') ||
-    shotType.includes('over-the-shoulder');
-
-  if (isActionOrTexture) {
-    return `Vertical 9:16 macro commercial advertising photograph: ${cleanedVisual}, showcasing ${productDesc || 'the product'}. Focus on hands, texture, glistening droplets and packaging detail, luxury studio lighting, aesthetic depth of field, 8k resolution, photorealistic commercial still`;
-  }
-
-  // Pure product showcase / packaging / apparel
-  return `Vertical 9:16 commercial product advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'the product'}, ${category || 'Premium Brand'} commercial styling, pristine studio lighting, elegant reflection, high-end packaging detail, crisp 8k photorealistic, no human face`;
+  // 6. General / Other Commercial Products
+  return `Vertical 9:16 commercial product advertisement photograph: ${cleanedVisual}. Featuring ${productDesc || 'the product'}, authentic real-world retail setting, natural human interactions where relevant, professional commercial lighting, sharp crisp focus, 8k photorealistic commercial still`;
 }
 
 function VideoGeneratorInner() {
@@ -139,6 +152,7 @@ function VideoGeneratorInner() {
 
   // Video Engine Mode
   const [videoMode, setVideoMode] = useState<'kinetic' | 'generative'>('kinetic');
+  const [showEngineInfo, setShowEngineInfo] = useState(false);
 
   // Kinetic Video Render state
   const [video, setVideo] = useState<RenderResult | null>(null);
@@ -705,7 +719,7 @@ function VideoGeneratorInner() {
 
             {/* Context Notice */}
             <div className="mb-4 p-2.5 rounded-xl bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)] text-[11px] text-[var(--text-soft)]">
-              💡 <strong>Contextual Visual AI:</strong> Faces are generated only for talking-head scenes; product macros and action textures are generated with pure product focus.
+              💡 <strong>Contextual Commercial AI:</strong> Realistic food preparation (chef hands, melting cheese, sizzling textures), glowing skincare droplets, or gold jewellery styling matching the exact scene script.
             </div>
 
             {/* Scene-by-Scene Visual Cards List */}
@@ -875,29 +889,74 @@ function VideoGeneratorInner() {
               <Clapperboard size={13} /> Step 2: Choose Video Engine & Theme
             </div>
 
-            <div className="grid grid-cols-2 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] mb-4 text-xs">
+            {/* Dual Engine Tabs */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[var(--input-bg)] border border-[var(--border)] mb-3 text-xs">
               <button
                 type="button"
                 onClick={() => setVideoMode('kinetic')}
-                className={`py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-2.5 rounded-lg font-medium transition-all flex flex-col items-center justify-center gap-0.5 text-center ${
                   videoMode === 'kinetic'
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    ? 'bg-[var(--neon)] text-black font-bold shadow-sm'
                     : 'text-[var(--text-soft)] hover:text-[var(--text)]'
                 }`}
               >
-                <Zap size={13} /> Instant Kinetic Reel
+                <span className="flex items-center gap-1 text-[11px]">
+                  <Zap size={13} /> Instant Kinetic Reel
+                </span>
+                <span className={`text-[9px] ${videoMode === 'kinetic' ? 'text-black/80' : 'text-[var(--success)]'} font-semibold`}>
+                  100% Free • All 7 Scenes
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setVideoMode('generative')}
-                className={`py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2 px-2.5 rounded-lg font-medium transition-all flex flex-col items-center justify-center gap-0.5 text-center ${
                   videoMode === 'generative'
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    ? 'bg-[var(--accent)] text-white font-bold shadow-sm'
                     : 'text-[var(--text-soft)] hover:text-[var(--text)]'
                 }`}
               >
-                <Film size={13} /> AI Generative Video
+                <span className="flex items-center gap-1 text-[11px]">
+                  <Film size={13} /> AI Generative Video
+                </span>
+                <span className={`text-[9px] ${videoMode === 'generative' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                  Cloud GPU Diffusion ($)
+                </span>
               </button>
+            </div>
+
+            {/* Difference / FAQ Toggle Button */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowEngineInfo(!showEngineInfo)}
+                className="text-[11px] text-[var(--accent-soft)] hover:underline flex items-center gap-1"
+              >
+                <HelpCircle size={12} />
+                {showEngineInfo ? 'Hide engine comparison' : 'What is the difference between Kinetic Reel and AI Generative Video?'}
+              </button>
+
+              {showEngineInfo && (
+                <div className="mt-2.5 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-[11px] space-y-2.5 animate-fade-in">
+                  <div className="p-2 rounded-lg bg-[color-mix(in_srgb,var(--neon)_8%,transparent)] border border-[color-mix(in_srgb,var(--neon)_20%,transparent)]">
+                    <p className="font-bold text-[var(--text)] flex items-center gap-1">
+                      <Zap size={12} className="text-[var(--neon)]" /> ⚡ Instant Kinetic Reel (100% Free & Recommended):
+                    </p>
+                    <p className="text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      Runs directly inside your browser. Takes all 7 scene visuals and produces a complete 30s vertical reel with animated kinetic typography, synchronized voiceover narration, promotional discount badges, and smooth transitions in ~3 seconds. <strong>Zero external API credits required.</strong>
+                    </p>
+                  </div>
+
+                  <div className="p-2 rounded-lg bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] border border-[color-mix(in_srgb,var(--accent)_20%,transparent)]">
+                    <p className="font-bold text-[var(--text)] flex items-center gap-1">
+                      <Film size={12} className="text-[var(--accent)]" /> 🎬 AI Generative Video (Replicate Cloud GPU):
+                    </p>
+                    <p className="text-[var(--text-muted)] mt-0.5 leading-relaxed">
+                      Uses remote cloud Nvidia A100 GPUs on Replicate (Lightricks LTX-Video). It animates a single still photo into a 5-second video with physical motion and camera sweeps. <strong>Requires paid Replicate account billing credits (~$0.05/run).</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {videoMode === 'kinetic' ? (
@@ -1100,15 +1159,27 @@ function VideoGeneratorInner() {
 
             {/* Error notifications */}
             {(videoError || aiVideoError) && (
-              <div className="mb-4 p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-xs text-[var(--danger)] flex items-start gap-2">
-                <AlertCircle size={15} className="shrink-0 mt-0.5" />
+              <div className="mb-4 p-3.5 rounded-xl border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-xs text-[var(--danger)] flex items-start gap-2.5">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold">Generation notice:</p>
-                  <p className="mt-0.5">{videoError || aiVideoError}</p>
+                  <p className="mt-0.5 leading-relaxed">{videoError || aiVideoError}</p>
                   {aiVideoError && (
-                    <p className="mt-1 text-[11px] text-[var(--text-soft)]">
-                      👉 Tip: You can switch to the <strong>⚡ Instant Kinetic Reel</strong> tab on the left to render your video reel immediately for free!
-                    </p>
+                    <div className="mt-2.5 pt-2 border-t border-[color-mix(in_srgb,var(--danger)_20%,transparent)] space-y-2">
+                      <p className="text-[11px] text-[var(--text-soft)] leading-relaxed">
+                        💡 <strong>Why this happens:</strong> Replicate is a paid external cloud GPU service ($0.05/generation). Your Replicate account has a $0 balance. You do NOT need to pay — you can render your entire 7-scene video immediately using the free built-in engine!
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVideoMode('kinetic');
+                          setAiVideoError('');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--neon)] text-black font-semibold text-xs hover:opacity-90 transition-all shadow-sm"
+                      >
+                        <Zap size={13} /> Switch to Free Instant Kinetic Reel (Zero Credits Needed)
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

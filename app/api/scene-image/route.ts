@@ -125,14 +125,16 @@ interface PollinationsResult {
 async function generateWithPollinations(prompt: string, aspect: Aspect): Promise<PollinationsResult> {
   const { width, height } = ASPECT_SIZES[aspect];
   const seed = Math.floor(Math.random() * 999999);
-  const models = ['turbo', 'sana'];
+  // Try default (Flux/high-fidelity) first, then turbo, then sana as fallback
+  const models = ['', 'turbo', 'sana'];
 
   for (const model of models) {
+    const modelParam = model ? `&model=${model}` : '';
     const url =
       `https://image.pollinations.ai/prompt/${encodeURIComponent(
         prompt + ', vertical composition, cinematic lighting, photorealistic, 8k commercial ad still'
       )}` +
-      `?width=${width}&height=${height}&nologo=true&model=${model}&seed=${seed}`;
+      `?width=${width}&height=${height}&nologo=true${modelParam}&seed=${seed}`;
 
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(25_000) });
@@ -140,8 +142,8 @@ async function generateWithPollinations(prompt: string, aspect: Aspect): Promise
       if (res.status === 402 || res.status === 429) {
         const text = await res.text();
         const match = text.match(/Retry after (\d+)s/i);
-        const retrySec = match ? parseInt(match[1], 10) : 40;
-        console.warn(`[scene-image] Pollinations free limit on ${model}. Retry after ${retrySec}s`);
+        const retrySec = match ? parseInt(match[1], 10) : 45;
+        console.warn(`[scene-image] Pollinations free limit on ${model || 'default'}. Retry after ${retrySec}s`);
         return { rateLimited: true, retryAfterSec: retrySec };
       }
 

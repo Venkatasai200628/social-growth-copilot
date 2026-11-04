@@ -9,17 +9,21 @@ import {
   Users, Image as ImageIcon, Video, MapPin, Wand2, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { upcomingFestivals, UpcomingFestival } from '@/lib/india';
 
-/* ── Festival urgency banner ────────────────────────────────────── */
-const DIWALI_DAYS = 6;
-
+/* ── Dynamic Festival urgency banner ────────────────────────────── */
 function FestivalBanner({ user }: { user: { uid: string } | null }) {
   const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
+  const [nextFestival, setNextFestival] = useState<UpcomingFestival | null>(null);
 
   useEffect(() => {
     try {
-      if (localStorage.getItem('gm_diwali_banner_dismissed') === '1') {
+      const upcoming = upcomingFestivals(new Date(), 90);
+      if (upcoming.length > 0) {
+        setNextFestival(upcoming[0]);
+      }
+      if (localStorage.getItem('gm_festival_banner_dismissed') === '1') {
         setDismissed(true);
       }
     } catch { /* ignore */ }
@@ -27,19 +31,26 @@ function FestivalBanner({ user }: { user: { uid: string } | null }) {
 
   const dismiss = () => {
     setDismissed(true);
-    try { localStorage.setItem('gm_diwali_banner_dismissed', '1'); } catch { /* ignore */ }
+    try { localStorage.setItem('gm_festival_banner_dismissed', '1'); } catch { /* ignore */ }
   };
 
-  if (dismissed) return null;
+  if (dismissed || !nextFestival) return null;
+
+  const label =
+    nextFestival.isNow || nextFestival.daysUntil <= 0
+      ? `🎉 ${nextFestival.name} is happening NOW — launch your festive campaign today!`
+      : nextFestival.daysUntil === 1
+      ? `🪔 ${nextFestival.name} is TOMORROW — grab last-minute festival shoppers!`
+      : `🪔 ${nextFestival.name} is in ${nextFestival.daysUntil} days — prepare your campaign & festival offers!`;
 
   return (
-    <div className="relative z-20 flex items-center justify-center gap-3 px-6 py-2.5 text-sm"
+    <div className="relative z-20 flex items-center justify-center gap-3 px-6 py-2.5 text-xs sm:text-sm"
       style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--gold) 20%, transparent), color-mix(in srgb, var(--gold) 12%, transparent), color-mix(in srgb, var(--gold) 20%, transparent))', borderBottom: '1px solid color-mix(in srgb, var(--gold) 25%, transparent)' }}>
-      <span>🪔 <strong>Diwali is in {DIWALI_DAYS} days</strong> — prepare your campaign and festival offers</span>
-      <button onClick={() => router.push(user ? '/home' : '/auth')}
-        className="flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full transition-all"
+      <span><strong>{label}</strong></span>
+      <button onClick={() => router.push(user ? `/campaign?festival=${nextFestival.id}` : '/auth')}
+        className="flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full transition-all shrink-0"
         style={{ background: 'color-mix(in srgb, var(--gold) 25%, transparent)', color: 'var(--gold)', border: '1px solid color-mix(in srgb, var(--gold) 40%, transparent)' }}>
-        Get Started <ArrowRight size={10} />
+        Plan Offer <ArrowRight size={10} />
       </button>
       <button onClick={dismiss} className="ml-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors text-lg leading-none absolute right-4">×</button>
     </div>
@@ -230,16 +241,16 @@ export default function LandingPage() {
       {/* Festival Banner */}
       <FestivalBanner user={user} />
 
-      {/* ── HERO ── */}
-      <section id="overview" className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-20">
+      {/* ── HERO & PLATFORM INTRODUCTION ── */}
+      <section id="overview" className="relative z-10 max-w-6xl mx-auto px-6 pt-14 pb-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left: text */}
           <div className="animate-slide-left">
-            <div className="inline-flex items-center gap-2 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-full px-5 py-2 text-xs text-[var(--accent-soft)] mb-6 tracking-widest uppercase">
+            <div className="inline-flex items-center gap-2 bg-[var(--accent)]/8 border border-[var(--accent)]/20 rounded-full px-5 py-2 text-xs text-[var(--accent-soft)] mb-5 tracking-widest uppercase">
               <Sparkles size={11} /> AI Marketing Copilot for Local Businesses
             </div>
 
-            <h1 className="font-display text-5xl md:text-6xl font-bold mb-6 leading-tight tracking-tight">
+            <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-5 leading-tight tracking-tight">
               <span className="text-[var(--text)]">Turn one product</span>{' '}
               <span className="text-[var(--accent-soft)]">into full campaigns.</span>
               <br />
@@ -249,9 +260,18 @@ export default function LandingPage() {
             <p className="text-[var(--text-muted)] text-base md:text-lg max-w-xl leading-relaxed mb-4">
               GrowMitra combines <strong className="text-[var(--text-soft)]">AI media creation with human expert assistance</strong> to turn simple phone photos into commercial posters, animated promo reels, WhatsApp flows, and strategic marketing calendars.
             </p>
-            <p className="text-[var(--text-faint)] text-xs md:text-sm max-w-lg mb-8">
-              Built specifically for jewellery shops, boutiques, cloud kitchens, and local retailers across India. No agencies. No design experience required.
-            </p>
+
+            {/* Why Business Owners Need GrowMitra */}
+            <div className="p-4 rounded-2xl bg-[var(--card)] border border-[var(--border)] mb-6 space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--neon)] flex items-center gap-1.5">
+                <Store size={13} /> Why Every Local Business Needs GrowMitra:
+              </h4>
+              <ul className="text-xs text-[var(--text-muted)] space-y-1.5 list-disc pl-4 leading-relaxed">
+                <li><strong className="text-[var(--text-soft)]">Replaces ₹25,000–₹50,000/mo agency retainers:</strong> Create commercial-grade marketing materials in 3 minutes without waiting 2 weeks.</li>
+                <li><strong className="text-[var(--text-soft)]">Built for Indian Festivals:</strong> Instant campaigns for Diwali, Pongal/Sankranti, Eid, Ugadi, Tamil New Year, and custom store sales.</li>
+                <li><strong className="text-[var(--text-soft)]">Drives Store Footfall & Orders:</strong> High-impact Instagram Reels, festival posters, and direct WhatsApp customer closing scripts.</li>
+              </ul>
+            </div>
 
             <div className="flex flex-wrap items-center gap-4">
               <button onClick={() => router.push('/auth')}
@@ -260,7 +280,7 @@ export default function LandingPage() {
               </button>
               <button onClick={() => document.getElementById('studios')?.scrollIntoView({ behavior: 'smooth' })}
                 className="flex items-center gap-2 px-8 py-4 rounded-full text-[var(--text-muted)] text-sm border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--text)] transition-all">
-                <Play size={13} /> Explore Studios <ChevronRight size={13} />
+                <Play size={13} /> Explore What&apos;s Inside <ChevronRight size={13} />
               </button>
             </div>
           </div>
@@ -268,6 +288,61 @@ export default function LandingPage() {
           {/* Right: phone mockup */}
           <div className="flex justify-center lg:justify-end">
             <PhoneMockup />
+          </div>
+        </div>
+
+        {/* ── WHAT'S PRESENT INSIDE (5 Dedicated Studios Quick Guide) ── */}
+        <div className="mt-14 pt-10 border-t border-[var(--border)]">
+          <div className="text-center mb-8">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[var(--accent-soft)]">Inside Your Marketing Workspace</span>
+            <h3 className="text-xl sm:text-2xl font-bold text-[var(--text)] mt-1 font-display">
+              5 Dedicated Studios Built For Fast Conversions
+            </h3>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {[
+              {
+                icon: Zap,
+                name: 'Campaign Studio',
+                badge: 'Multi-Day Strategy',
+                desc: 'Generate complete 3 to 7-day marketing campaigns with hooks, budgets, and schedules.',
+              },
+              {
+                icon: Film,
+                name: 'Video Studio',
+                badge: '100% Free Reels',
+                desc: 'Instant CapCut-grade kinetic typography reels with voiceover and promo badges.',
+              },
+              {
+                icon: ImageIcon,
+                name: 'Post Studio',
+                badge: 'Festive Graphics',
+                desc: 'High-converting posters in 1:1, 4:5, and 9:16 sizes with 30+ regional Indian palettes.',
+              },
+              {
+                icon: Star,
+                name: 'Virality Scorer',
+                badge: 'A/B Hook Testing',
+                desc: 'Score your captions and hooks head-to-head before posting to maximize reach.',
+              },
+              {
+                icon: Brain,
+                name: 'AI Growth Coach',
+                badge: 'Tactical Advice',
+                desc: 'Actionable guidance and WhatsApp broadcast templates to close inquiries faster.',
+              },
+            ].map(({ icon: Icon, name, badge, desc }) => (
+              <div key={name} className="p-4 rounded-2xl bg-[var(--card)] border border-[var(--border)] hover:border-[var(--accent)]/50 transition-all flex flex-col justify-between">
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center text-[var(--accent-soft)] mb-3">
+                    <Icon size={16} />
+                  </div>
+                  <h4 className="text-sm font-bold text-[var(--text)]">{name}</h4>
+                  <span className="text-[10px] text-[var(--neon)] font-semibold uppercase tracking-wider block mt-0.5 mb-2">{badge}</span>
+                  <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
