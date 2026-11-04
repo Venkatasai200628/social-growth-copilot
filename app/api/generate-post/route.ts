@@ -32,9 +32,6 @@ interface PostResult {
   image_prompt?: string;
 }
 
-interface TogetherImage {
-  data?: Array<{ url?: string; b64_json?: string }>;
-}
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -170,50 +167,67 @@ Return EXACTLY this JSON structure (use the literal token [BREAK] instead of rea
           .slice(0, 8)
       : [];
 
-    // ── AI background image (optional bonus — never fatal) ──────────
+    // ── AI background / hero image (Backend Gemini & Fast Server-Side Proxy) ──────────
     let image_url: string | null = null;
-    const tk = process.env.TOGETHER_API_KEY;
-    const keyLooksReal = !!tk && tk.length > 10 && !tk.includes('your_') && !tk.includes('placeholder');
     const imagePrompt =
       oneLine(raw.image_prompt, 800) ||
-      `${customPrompt || productDescription}, premium brand photography, professional studio lighting, ultra high quality, 4K`;
+      `${customPrompt || productDescription}, premium product commercial photography, studio lighting, high resolution, 4K`;
 
-    if (keyLooksReal && tk) {
+    // 1. Try Gemini backend key (never exposed to client)
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey && geminiKey.trim().length > 10) {
+      const models = ['gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation'];
+      const promptText = `${imagePrompt} — square 1:1 commercial brand photography, clean product framing, no text, no watermark`;
+      for (const model of models) {
+        try {
+          const gr = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'x-goog-api-key': geminiKey.trim(),
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: { responseModalities: ['IMAGE'] },
+              }),
+              signal: AbortSignal.timeout(25_000),
+            }
+          );
+          if (gr.ok) {
+            const gd = (await gr.json()) as {
+              candidates?: { content?: { parts?: { inlineData?: { mimeType?: string; data?: string } }[] } }[];
+            };
+            const inline = gd.candidates?.[0]?.content?.parts?.find(
+              (p) => typeof p.inlineData?.data === 'string' && p.inlineData.data.length > 0
+            )?.inlineData;
+            if (inline?.data) {
+              image_url = `data:${inline.mimeType || 'image/png'};base64,${inline.data}`;
+              break;
+            }
+          }
+        } catch {
+          /* continue to next model or fallback */
+        }
+      }
+    }
+
+    // 2. Fallback: Fetch server-side image to avoid client-side CORS issues
+    if (!image_url) {
       try {
-        const ir = await fetch('https://api.together.xyz/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${tk}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'black-forest-labs/FLUX.1-schnell-Free',
-            prompt: imagePrompt,
-            width: 1024,
-            height: 1024,
-            steps: 4,
-            n: 1,
-          }),
-          // Optional bonus feature — never let a hung image API hang the route.
-          signal: AbortSignal.timeout(30000),
-        });
-        if (ir.ok) {
-          const img = (await ir.json()) as TogetherImage;
-          const d = img?.data?.[0];
-          image_url = d?.url ?? (d?.b64_json ? `data:image/png;base64,${d.b64_json}` : null);
+        const fallbackUrl =
+          `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}` +
+          `?width=1024&height=1024&nologo=true&model=flux&seed=${Math.floor(Math.random() * 99999)}`;
+        const fr = await fetch(fallbackUrl, { signal: AbortSignal.timeout(20_000) });
+        if (fr.ok) {
+          const buf = await fr.arrayBuffer();
+          const mime = fr.headers.get('content-type') || 'image/jpeg';
+          image_url = `data:${mime};base64,${Buffer.from(buf).toString('base64')}`;
         }
       } catch {
         image_url = null;
       }
-    }
-
-    if (!image_url) {
-      // Free fallback: Pollinations — no API key needed. The URL generates
-      // the image when the browser loads it, so there is nothing to fail
-      // server-side; if it's down the <img> just stays empty.
-      image_url =
-        `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}` +
-        `?width=1024&height=1024&nologo=true&model=flux&seed=${Math.floor(Math.random() * 99999)}`;
     }
 
     return NextResponse.json({

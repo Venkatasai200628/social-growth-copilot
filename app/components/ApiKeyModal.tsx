@@ -31,10 +31,9 @@ interface ApiKeyModalProps {
 
 export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps) {
   const [keys, setKeys] = useState<UserApiKeys>({});
-  const [replicateInput, setReplicateInput] = useState('');
-  const [geminiInput, setGeminiInput] = useState('');
   const [metaInput, setMetaInput] = useState('');
-  const [showTokens, setShowTokens] = useState<{ replicate?: boolean; gemini?: boolean; meta?: boolean }>({});
+  const [replicateInput, setReplicateInput] = useState('');
+  const [showTokens, setShowTokens] = useState<{ replicate?: boolean; meta?: boolean }>({});
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -42,9 +41,8 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
     if (isOpen) {
       const current = loadUserApiKeys();
       setKeys(current);
-      setReplicateInput(current.replicateToken || '');
-      setGeminiInput(current.geminiKey || '');
       setMetaInput(current.metaKey || current.groqKey || '');
+      setReplicateInput(current.replicateToken || '');
       setErrorMsg('');
       setSuccessMsg('');
     }
@@ -52,31 +50,13 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
 
   if (!isOpen) return null;
 
-  const toggleShow = (provider: 'replicate' | 'gemini' | 'meta') => {
+  const toggleShow = (provider: 'replicate' | 'meta') => {
     setShowTokens((prev) => ({ ...prev, [provider]: !prev[provider] }));
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-
-    // Validate replicate token if entered
-    if (replicateInput.trim()) {
-      const val = validateKeyFormat('replicateToken', replicateInput);
-      if (!val.valid) {
-        setErrorMsg(val.error || 'Invalid Replicate token');
-        return;
-      }
-    }
-
-    // Validate gemini key if entered
-    if (geminiInput.trim()) {
-      const val = validateKeyFormat('geminiKey', geminiInput);
-      if (!val.valid) {
-        setErrorMsg(val.error || 'Invalid Gemini key');
-        return;
-      }
-    }
 
     // Validate meta key if entered
     if (metaInput.trim()) {
@@ -87,11 +67,19 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
       }
     }
 
+    // Validate replicate token if entered
+    if (replicateInput.trim()) {
+      const val = validateKeyFormat('replicateToken', replicateInput);
+      if (!val.valid) {
+        setErrorMsg(val.error || 'Invalid Replicate token');
+        return;
+      }
+    }
+
     const updated: UserApiKeys = {
-      replicateToken: replicateInput.trim() || undefined,
-      geminiKey: geminiInput.trim() || undefined,
       metaKey: metaInput.trim() || undefined,
       groqKey: metaInput.trim() || undefined,
+      replicateToken: replicateInput.trim() || undefined,
     };
 
     saveUserApiKeys(updated);
@@ -107,9 +95,8 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
     clearUserApiKey(provider);
     const current = loadUserApiKeys();
     setKeys(current);
-    if (provider === 'replicateToken') setReplicateInput('');
-    if (provider === 'geminiKey') setGeminiInput('');
     if (provider === 'metaKey' || provider === 'groqKey') setMetaInput('');
+    if (provider === 'replicateToken') setReplicateInput('');
 
     setSuccessMsg(`Cleared ${provider} key. Using system default.`);
     if (onKeysChanged) onKeysChanged();
@@ -126,7 +113,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
             </div>
             <div>
               <h3 className="text-sm font-bold text-[var(--text)]">Secure AI API Key Manager (BYOK)</h3>
-              <p className="text-[10px] text-[var(--text-muted)]">Connect your personal AI keys with zero server exposure</p>
+              <p className="text-[10px] text-[var(--text-muted)]">Connect personal AI keys with zero server database exposure</p>
             </div>
           </div>
           <button
@@ -144,7 +131,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
             <ShieldCheck size={14} /> 100% Client-Side Privacy &amp; Security Guaranteed
           </div>
           <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-            Your keys are stored <strong>strictly on your local device browser</strong> (<code className="text-white">localStorage</code>). They are NEVER saved to our shared database, NEVER accessible to other users, and NEVER logged on our servers.
+            Your keys are stored <strong>strictly in your browser</strong> (<code className="text-white">localStorage</code>). They are NEVER saved to our shared database, NEVER accessible to other users, and NEVER logged on our servers.
           </p>
         </div>
 
@@ -177,7 +164,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
               </a>
             </div>
             <p className="text-[10px] text-[var(--text-muted)]">
-              Powers Meta Model API with Muse Spark (campaigns &amp; roadmaps), Muse Wonder (commercial copywriting &amp; video scripts), and Muse Code (agentic workflows). Supports Meta Model API and local inference keys.
+              Powers Meta Model API with Muse Spark (campaigns &amp; roadmaps), Muse Wonder (copywriting &amp; video scripts), and Muse Code (agentic workflows). Supports Meta API &amp; local inference keys.
             </p>
             <div className="relative">
               <input
@@ -230,7 +217,7 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
               </a>
             </div>
             <p className="text-[10px] text-[var(--text-muted)]">
-              Powers Lightricks LTX-Video. If you sign up a new account on Replicate or have credit, paste your token here.
+              Powers Lightricks LTX-Video. If you have a personal Replicate account with GPU credit, paste your token here to bypass shared quotas.
             </p>
             <div className="relative">
               <input
@@ -267,59 +254,6 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
             )}
           </div>
 
-          {/* 3. Google Gemini API Key (Images only) */}
-          <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--input-bg)] space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="font-semibold text-[var(--text)] flex items-center gap-1.5">
-                <Sparkles size={13} className="text-[var(--gold)]" /> Google Gemini API Key (For Scene Visuals)
-              </label>
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-[var(--gold)] hover:underline flex items-center gap-1"
-              >
-                Get Free Gemini Key <ExternalLink size={10} />
-              </a>
-            </div>
-            <p className="text-[10px] text-[var(--text-muted)]">
-              Unlocks Google Gemini image models for realistic scene visuals without any Pollinations cooldowns!
-            </p>
-            <div className="relative">
-              <input
-                type={showTokens.gemini ? 'text' : 'password'}
-                value={geminiInput}
-                onChange={(e) => setGeminiInput(e.target.value)}
-                placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg pl-3 pr-16 py-2 text-xs font-mono text-[var(--text)] focus:border-[var(--gold)] outline-none"
-              />
-              <div className="absolute right-2 top-2 flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => toggleShow('gemini')}
-                  className="text-[var(--text-muted)] hover:text-white p-0.5"
-                >
-                  {showTokens.gemini ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-                {keys.geminiKey && (
-                  <button
-                    type="button"
-                    onClick={() => handleClear('geminiKey')}
-                    title="Clear key"
-                    className="text-red-400 hover:text-red-300 p-0.5"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            </div>
-            {keys.geminiKey && (
-              <span className="inline-block text-[10px] font-mono text-[var(--success)]">
-                ● Active Key: {maskApiKey(keys.geminiKey)}
-              </span>
-            )}
-          </div>
-
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
@@ -336,4 +270,3 @@ export function ApiKeyModal({ isOpen, onClose, onKeysChanged }: ApiKeyModalProps
 }
 
 export default ApiKeyModal;
-

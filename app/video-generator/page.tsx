@@ -290,6 +290,12 @@ function VideoGeneratorInner() {
           }
         }
       }
+
+      // Restore previously generated AI video URL if present in session or local storage
+      const savedAiVideo = sessionStorage.getItem('gm_ai_video_url') || localStorage.getItem('gm_ai_video_url');
+      if (savedAiVideo) {
+        setAiVideoUrl(savedAiVideo);
+      }
     } catch {
       /* ignore */
     }
@@ -577,7 +583,23 @@ function VideoGeneratorInner() {
       }
 
       setAiVideoUrl(data.videoUrl);
-      toast('Generative AI Video completed with physical motion! 🎬', 'ai');
+      try {
+        sessionStorage.setItem('gm_ai_video_url', data.videoUrl);
+        localStorage.setItem('gm_ai_video_url', data.videoUrl);
+        const historyItem = {
+          id: 'video-' + Date.now(),
+          title: scriptData?.title || businessName || 'AI Video Reel',
+          videoUrl: data.videoUrl,
+          type: 'generative',
+          createdAt: Date.now(),
+        };
+        const history = JSON.parse(localStorage.getItem('gm_video_history') || '[]');
+        history.unshift(historyItem);
+        localStorage.setItem('gm_video_history', JSON.stringify(history.slice(0, 20)));
+      } catch {
+        /* storage full / unavailable */
+      }
+      toast('Generative AI Video completed and saved to your studio! 🎬', 'ai');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to generate AI video';
       setAiVideoError(msg);
@@ -1394,6 +1416,14 @@ function VideoGeneratorInner() {
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Save Confirmation Banner */}
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-between text-xs text-emerald-400">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 size={13} /> Video Saved &amp; Ready for Instant Download
+                  </span>
+                  <span className="text-[10px] text-emerald-400/80">Saved to session</span>
                 </div>
 
                 {/* Big Action Buttons */}
